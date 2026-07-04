@@ -124,6 +124,7 @@ const props = defineProps({
   selected: { type: Array, default: () => [] },
   defaultGroupId: { type: String, default: null }, // 默认选中的分组
   defaultGroupName: { type: String, default: null }, // 默认分组名称（用于自动创建）
+  mode: { type: String, default: 'all' }, // 'tag' | 'knowledge-point' | 'all'
 })
 
 const emit = defineEmits(['select', 'update:visible'])
@@ -236,7 +237,14 @@ watch(() => props.visible, async (val) => {
 async function loadGroups() {
   try {
     const result = await getTagGroupList({ pageSize: 200 })
-    groupList.value = result.list || []
+    // 按 mode 过滤分组
+    let groups = result.list || []
+    if (props.mode === 'tag') {
+      groups = groups.filter(g => g.slug !== 'knowledge-point')
+    } else if (props.mode === 'knowledge-point') {
+      groups = groups.filter(g => g.slug === 'knowledge-point')
+    }
+    groupList.value = groups
   } catch (e) {
     /* ignore */
   }
