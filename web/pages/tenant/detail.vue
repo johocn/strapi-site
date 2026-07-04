@@ -649,12 +649,12 @@ onMounted(async () => {
   if (options.documentId) {
     documentId.value = options.documentId
     isEdit.value = true
+    await loadTemplates()
     await loadTenantDetail()
   }
 
   await loadChannels()
   await loadThirdConfigs()
-  await loadTemplates()
 })
 
 async function loadTenantDetail() {
@@ -722,6 +722,9 @@ async function loadTenantDetail() {
         themeConfig.value = { ...themeConfig.value, ...tc }
       } catch { /* ignore */ }
     }
+    // 回填预设模板选中状态
+    const tplId = data.template?.documentId ?? data.template
+    currentTemplate.value = tplId ? (templateList.value.find(t => t.documentId === tplId) ?? null) : null
   } catch (e) {
     uni.showToast({ title: '加载失败', icon: 'none' })
   } finally {
@@ -988,6 +991,7 @@ async function saveTenant(goBack = false) {
     channels: selectedChannels.value.map(ch => ch.documentId || ch.id),
     featureFlags: formData.featureFlags,
     ...mergedExtraConfig,
+    template: currentTemplate.value?.documentId ?? null,
     themeConfig: JSON.stringify(themeConfig.value)
   }
 
