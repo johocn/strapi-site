@@ -447,6 +447,18 @@ const saving = ref(false)
 const loading = ref(false)
 const originalExtraConfig = ref({})
 
+// schema 字段集（存入 site-config 列，非 extraConfig）
+// 与后端 updateSiteById 的 SITE_FIELDS 保持一致
+const SCHEMA_FIELDS = new Set([
+  'siteName', 'siteDescription', 'logo', 'favicon', 'icpNumber',
+  'seoKeywords', 'seoDescription', 'tencentMapKey', 'shareTitle',
+  'shareDescription', 'shareImage', 'customerServiceUrl',
+  'featureFlags', 'domain', 'template', 'themeConfig',
+  'channels', 'extraConfig',
+  'documentId', 'id', 'createdAt', 'updatedAt', 'publishedAt',
+  'createdBy', 'updatedBy', 'locale', '_meta',
+])
+
 const authModeOptions = [
   { value: 'local', label: '本地登录（账号密码/手机验证码）' },
   { value: 'third', label: '三方登录（微信/支付宝/抖音）' },
@@ -658,7 +670,12 @@ async function loadTenantDetail() {
       Object.assign(ec, ec.extraConfig)
       delete ec.extraConfig
     }
-    originalExtraConfig.value = { ...ec }
+    // 只保留真正的 extraConfig 字段（排除 schema 字段），避免保存时旧值覆盖 formData 新值
+    const filteredEc = {}
+    for (const [k, v] of Object.entries(ec)) {
+      if (!SCHEMA_FIELDS.has(k)) filteredEc[k] = v
+    }
+    originalExtraConfig.value = filteredEc
     Object.assign(formData, {
       siteName: data.siteName || '',
       domain: data.domain || '',
