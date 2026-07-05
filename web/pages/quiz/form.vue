@@ -54,13 +54,25 @@
 
         <view class="form-item">
           <text class="form-label">关联课时</text>
-          <view 
-            class="picker-value" 
+          <view
+            class="picker-value"
             :class="{ empty: !form.lesson }"
             @click="showLessonPicker = true"
           >
             <text>{{ form.lesson?.title || '请选择课时' }}</text>
             <text class="picker-arrow">▼</text>
+          </view>
+        </view>
+
+        <view class="lesson-points-info" v-if="form.lesson && lessonPointsInfo">
+          <view class="info-chip" :class="{ off: !lessonPointsInfo.enablePoints }">
+            {{ lessonPointsInfo.enablePoints ? '积分已开启' : '积分未开启' }}
+          </view>
+          <view class="info-chip" v-if="lessonPointsInfo.enablePoints">
+            类型：{{ lessonPointsInfo.pointsType === 'quiz_points' ? '答题积分' : '课时积分' }}
+          </view>
+          <view class="info-chip warn" v-if="lessonPointsInfo.enablePoints && lessonPointsInfo.pointsType !== 'quiz_points'">
+            当前课时类型不支持答题积分
           </view>
         </view>
 
@@ -188,12 +200,13 @@
           </view>
           <view class="form-item half">
             <text class="form-label">分值</text>
-            <input 
-              type="number" 
-              v-model="form.points" 
+            <input
+              type="number"
+              v-model="form.points"
               placeholder="0"
               class="form-input"
             />
+            <text class="form-tip">仅当关联课时积分类型=quiz_points 时生效</text>
           </view>
         </view>
 
@@ -941,5 +954,38 @@ onMounted(async () => {
   width: 100%;
   height: 80rpx;
   border-radius: 40rpx;
+}
+
+.form-tip {
+  display: block;
+  font-size: 22rpx;
+  color: #999;
+  margin-top: 8rpx;
+  line-height: 1.4;
+}
+.lesson-points-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 12rpx;
+  padding-left: 0;
+}
+.info-chip {
+  font-size: 22rpx;
+  padding: 6rpx 16rpx;
+  border-radius: 20rpx;
+  background: #e6f7ff;
+  color: #1890ff;
+  border: 1rpx solid #91d5ff;
+}
+.info-chip.off {
+  background: #f5f5f5;
+  color: #999;
+  border-color: #e8e8e8;
+}
+.info-chip.warn {
+  background: #fff7e6;
+  color: #fa8c16;
+  border-color: #ffd591;
 }
 </style>
