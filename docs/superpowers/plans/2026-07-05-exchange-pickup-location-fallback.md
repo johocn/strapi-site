@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** shao 目录积分兑换页增加渠道过滤与自提点兜底逻辑——商品列表按可访问渠道过滤，兑换弹窗按商品渠道拉取自提点并根据数量自动处理（0 隐藏 / 1 自动选中 / >1 单选）。
+**Goal:** shao 目录积分兑换页增加渠道过滤与自提点兜底逻辑——后端 getProducts 改用 zhao-common available channels（site ∪ user）过滤商品，前端兑换弹窗按商品渠道拉取自提点并根据数量自动处理（0 隐藏 / 1 自动选中 / >1 单选）。
 
-**Architecture:** 仅前端改动 `shao/pages/exchange/exchange.vue` 与 `shao/services/api.ts`（新增 `getAvailableChannels`）。后端接口已就绪：`/zhao-common/v1/channels/available` 与 `/zhao-point/v1/point/pickup-locations?channelId=xxx`。
+**Architecture:** 后端改动 3 处（zhao-common 抽取 service 方法、controller 重构、zhao-point getProducts 改用 service）；前端改动 1 处（exchange.vue 自提点兜底 + 内联单选 UI）。商品 channel 是 manyToOne，不会重复，无需去重。
 
-**Tech Stack:** Vue 3 + uni-app + TypeScript。
+**Tech Stack:** Strapi v5 + Vue 3 + uni-app + TypeScript。
 
 **Spec:** `docs/superpowers/specs/2026-07-05-exchange-pickup-location-fallback-design.md`
 
@@ -16,50 +16,312 @@
 
 | 文件 | 责任 | 改动类型 |
 |------|------|----------|
-| `shao/services/api.ts` | API 接口定义 | 修改（新增 `getAvailableChannels`） |
-| `shao/pages/exchange/exchange.vue` | 兑换页组件 | 修改（商品过滤 + 自提点兜底 + 内联单选 UI） |
+| `basic/plugins/zhao-common/server/src/services/site-config.ts` | 站点配置 + available channels service | 修改（新增方法） |
+| `basic/plugins/zhao-common/server/src/controllers/config.ts` | available channels controller | 修改（重构为调用 service） |
+| `basic/plugins/zhao-point/server/src/controllers/point.ts` | listProducts controller | 修改（传入 siteId） |
+| `basic/plugins/zhao-point/server/src/services/redemption.ts` | getProducts service | 修改（改用 zhao-common service） |
+| `shao/pages/exchange/exchange.vue` | 兑换页组件 | 修改（自提点兜底 + 内联单选 UI） |
 
-无新增文件。后端无改动。
+无新增文件。
 
 ---
 
-### Task 1: api.ts 新增 getAvailableChannels
+### Task 1: zhao-common site-config service 新增 getAvailableChannels 方法
 
 **Files:**
-- Modify: `shao/services/api.ts`（在自提点 API 区段之前或积分 API 区段之后新增）
+- Modify: `basic/plugins/zhao-common/server/src/services/site-config.ts`
 
-- [ ] **Step 1: 在 `shao/services/api.ts` 第 377 行附近（`getPointRules` 函数之后）新增 `getAvailableChannels` 函数**
+- [ ] **Step 1: 在 site-config.ts 末尾（`}` 闭合 `getConfigByDomain` 方法之后、`});` 闭合 export 之前）新增 `getAvailableChannels` 方法**
 
-定位锚点：找到 `export async function getPointRules(params?: { action?: string; category?: string })` 函数结束的位置（第 377 行），在其后插入：
+定位 `basic/plugins/zhao-common/server/src/services/site-config.ts`，找到 `getConfigByDomain` 方法结束的位置（约第 50 行），在其后新增方法：
 
 ```ts
-// 获取用户可访问渠道（site channels ∪ user channels）
-export async function getAvailableChannels() {
-  const res = await request('/zhao-common/v1/channels/available')
-  return res?.data ?? res
-}
+  /**
+   * 获取用户可访问渠道（site channels ∪ user direct channels，按 numeric id 去重）
+   * 跨插件复用：zhao-point getProducts 等场景调用
+   * @param siteId site-config documentId
+   * @param userId 用户 id
+   * @returns 渠道列表 [{ id, documentId, name }]
+   */
+  async getAvailableChannels(siteId?: string, userId?: string | number) {
+    const siteChannels: any[] = [];
+    if (siteId) {
+      const siteConfig = await this.getConfig(siteId);
+      if (siteConfig?.channels && Array.isArray(siteConfig.channels)) {
+        for (const ch of siteConfig.channels) {
+          siteChannels.push({
+            id: ch.id,
+            documentId: ch.documentId,
+            name: ch.name,
+          });
+        }
+      }
+    }
+
+    const userChannels: any[] = [];
+    if (userId) {
+      const channelPermissionService = strapi.plugin("zhao-channel")?.service("channel-permission");
+      if (channelPermissionService && typeof channelPermissionService.getUserDirectChannels === "function") {
+        const userChannelIds = await channelPermissionService.getUserDirectChannels(userId);
+        if (Array.isArray(userChannelIds)) {
+          const channels = await strapi.db.query("plugin::zhao-channel.channel").findMany({
+            where: { id: { $in: userChannelIds } },
+            select: ["id", "documentId", "name"],
+          });
+          for (const ch of channels) {
+            userChannels.push({
+              id: ch.id,
+              documentId: ch.documentId,
+              name: ch.name,
+            });
+          }
+        }
+      }
+    }
+
+    // 合并去重（按 numeric id）
+    const merged = new Map();
+    for (const ch of [...siteChannels, ...userChannels]) {
+      const key = String(ch.id);
+      if (!merged.has(key)) {
+        merged.set(key, ch);
+      }
+    }
+    return Array.from(merged.values());
+  },
 ```
 
-- [ ] **Step 2: 验证文件无语法错误**
+- [ ] **Step 2: 验证 TS 编译**
 
 Run:
 ```bash
-cd e:\code\shao && npx tsc --noEmit -p tsconfig.json 2>&1 | head -30
+cd e:\code\basic\plugins\zhao-common && npx tsc --noEmit -p tsconfig.json 2>&1 | head -30
 ```
-Expected: 无新增错误（已有错误可能存在，重点看新增的 `getAvailableChannels` 是否引发报错）。
+Expected: 无新增错误。
 
-- [ ] **Step 3: 提交**
+- [ ] **Step 3: 构建 zhao-common 插件**
 
-`shao` 目录在 `e:\code` git 仓库外（untracked），跳过 git commit。改动保留在工作区即可。
+Run:
+```bash
+cd e:\code\basic\plugins\zhao-common && npm run build 2>&1 | tail -10
+```
+Expected: 构建成功，`dist/` 目录更新。
+
+- [ ] **Step 4: 提交**
+
+```bash
+cd e:\code && git add basic/plugins/zhao-common/server/src/services/site-config.ts && git commit -m "feat(zhao-common): site-config service 新增 getAvailableChannels 方法"
+```
 
 ---
 
-### Task 2: exchange.vue 引入 getAvailableChannels 并改造商品列表过滤
+### Task 2: zhao-common controller 重构 getAvailableChannels 调用 service
 
 **Files:**
-- Modify: `shao/pages/exchange/exchange.vue:266`（import）与 `546-584`（loadData）
+- Modify: `basic/plugins/zhao-common/server/src/controllers/config.ts:861-922`
 
-- [ ] **Step 1: 修改 import 语句**
+- [ ] **Step 1: 替换 getAvailableChannels controller 方法体**
+
+定位 `basic/plugins/zhao-common/server/src/controllers/config.ts:861-922`，整个 `getAvailableChannels` 方法替换为：
+
+```ts
+  async getAvailableChannels(ctx: any) {
+    try {
+      const siteId = ctx.state?.siteId;
+      const userId = ctx.state?.user?.id;
+
+      if (!siteId) {
+        ctx.status = 400;
+        ctx.body = { error: "缺少站点标识" };
+        return;
+      }
+
+      const channels = await strapi.plugin("zhao-common").service("site-config").getAvailableChannels(siteId, userId);
+      ctx.body = {
+        data: channels,
+      };
+    } catch (error: any) {
+      ctx.status = error.status ?? 500;
+      ctx.body = { error: error.message };
+    }
+  },
+```
+
+- [ ] **Step 2: 验证 TS 编译**
+
+Run:
+```bash
+cd e:\code\basic\plugins\zhao-common && npx tsc --noEmit -p tsconfig.json 2>&1 | head -30
+```
+Expected: 无新增错误。
+
+- [ ] **Step 3: 构建 zhao-common 插件**
+
+Run:
+```bash
+cd e:\code\basic\plugins\zhao-common && npm run build 2>&1 | tail -10
+```
+Expected: 构建成功。
+
+- [ ] **Step 4: 提交**
+
+```bash
+cd e:\code && git add basic/plugins/zhao-common/server/src/controllers/config.ts && git commit -m "refactor(zhao-common): getAvailableChannels controller 改为调用 service"
+```
+
+---
+
+### Task 3: zhao-point listProducts controller 传入 siteId
+
+**Files:**
+- Modify: `basic/plugins/zhao-point/server/src/controllers/point.ts:152-168`
+
+- [ ] **Step 1: 修改 listProducts controller，传入 siteId**
+
+定位 `basic/plugins/zhao-point/server/src/controllers/point.ts:152-168`，整个 `listProducts` 方法替换为：
+
+```ts
+  async listProducts(ctx: any) {
+    try {
+      const userId = ctx.state.user?.id;
+      const siteId = ctx.state?.siteId;
+      const { status, deliveryType, page, pageSize } = ctx.query;
+      const result = await strapi.plugin("zhao-point").service("redemption").getProducts({
+        status: status || "on_shelf",
+        deliveryType,
+        page: page ? parseInt(page) : 1,
+        pageSize: pageSize ? parseInt(pageSize) : 20,
+        userId,
+        siteId,
+      });
+      ctx.body = wrapList(result);
+    } catch (e: any) {
+      ctx.status = (e as any).status || 400;
+      ctx.body = { error: e.message };
+    }
+  },
+```
+
+- [ ] **Step 2: 验证 TS 编译**
+
+Run:
+```bash
+cd e:\code\basic\plugins\zhao-point && npx tsc --noEmit -p tsconfig.json 2>&1 | head -30
+```
+Expected: 无新增错误（siteId 参数已在 getProducts 签名中，Task 4 会添加）。
+
+**注意**：此 Task 3 与 Task 4 必须一起完成才能编译通过。如单独验证 Task 3 会报 `siteId` 参数类型错误，属正常。
+
+---
+
+### Task 4: zhao-point getProducts service 改用 zhao-common available channels
+
+**Files:**
+- Modify: `basic/plugins/zhao-point/server/src/services/redemption.ts:100-152`
+
+- [ ] **Step 1: 替换 getProducts 函数签名与渠道过滤逻辑**
+
+定位 `basic/plugins/zhao-point/server/src/services/redemption.ts:100-152`，整个 `getProducts` 函数替换为：
+
+```ts
+  const getProducts = async (filters?: {
+    status?: string;
+    deliveryType?: string;
+    name?: string;
+    page?: number;
+    pageSize?: number;
+    userId?: string | number;
+    siteId?: string;
+    extraWhere?: Record<string, any>;
+  }) => {
+    const { status, deliveryType, name, page = 1, pageSize = 20, userId, siteId, extraWhere } = filters || {};
+    const where: any = { deletedAt: null, status: status || "on_shelf" };
+    if (deliveryType) where.deliveryType = deliveryType;
+    if (name) where.name = { $containsi: name };
+    if (extraWhere && typeof extraWhere === "object" && !Array.isArray(extraWhere)) {
+      Object.assign(where, extraWhere);
+    }
+
+    // 使用 zhao-common available channels（site ∪ user）过滤
+    if (userId && siteId) {
+      const availableChannels = await strapi.plugin("zhao-common").service("site-config").getAvailableChannels(siteId, userId);
+      const channelIds = availableChannels.map((c: any) => c.id).filter(Boolean);
+
+      if (channelIds.length > 0) {
+        where.$or = [
+          { channel: { $in: channelIds } },
+          { allowCrossChannel: true },
+        ];
+      } else {
+        // 用户与站点皆无渠道，仅看跨渠道商品
+        where.allowCrossChannel = true;
+      }
+    } else if (userId) {
+      // 无 siteId 兜底：退回 user channels 查询
+      const members = await strapi.db.query(CHANNEL_MEMBER_UID).findMany({
+        where: { user: userId },
+        populate: { channel: { select: ['id'] } },
+      });
+      const userChannelIds = members.map((m: any) => m.channel?.id || m.channel).filter(Boolean);
+      if (userChannelIds.length > 0) {
+        where.$or = [
+          { channel: { $in: userChannelIds } },
+          { allowCrossChannel: true },
+        ];
+      } else {
+        where.allowCrossChannel = true;
+      }
+    }
+
+    const [records, total] = await Promise.all([
+      strapi.db.query(PRODUCT_UID).findMany({
+        where,
+        orderBy: { sortOrder: "asc" },
+        offset: (page - 1) * pageSize,
+        limit: pageSize,
+        populate: {
+          channel: { select: ['id', 'documentId', 'name'] },
+          coverImage: true,
+          images: true,
+        },
+      }),
+      strapi.db.query(PRODUCT_UID).count({ where }),
+    ]);
+
+    return { records, total, page, pageSize };
+  };
+```
+
+- [ ] **Step 2: 验证 TS 编译**
+
+Run:
+```bash
+cd e:\code\basic\plugins\zhao-point && npx tsc --noEmit -p tsconfig.json 2>&1 | head -30
+```
+Expected: 无新增错误。
+
+- [ ] **Step 3: 构建 zhao-point 插件**
+
+Run:
+```bash
+cd e:\code\basic\plugins\zhao-point && npm run build 2>&1 | tail -10
+```
+Expected: 构建成功，`dist/` 目录更新。
+
+- [ ] **Step 4: 提交**
+
+```bash
+cd e:\code && git add basic/plugins/zhao-point/server/src/controllers/point.ts basic/plugins/zhao-point/server/src/services/redemption.ts && git commit -m "feat(zhao-point): getProducts 改用 zhao-common available channels 过滤"
+```
+
+---
+
+### Task 5: exchange.vue 新增 pickupLocations 状态与 loadPickupLocations 函数
+
+**Files:**
+- Modify: `shao/pages/exchange/exchange.vue`
+
+- [ ] **Step 1: 修改 import 语句引入 getPickupLocationList**
 
 定位 `shao/pages/exchange/exchange.vue:266`：
 
@@ -70,121 +332,17 @@ import { getPointBalance, getPointProductList, redeemPoints } from '../../servic
 改为：
 
 ```ts
-import { getPointBalance, getPointProductList, redeemPoints, getAvailableChannels } from '../../services/api'
+import { getPointBalance, getPointProductList, redeemPoints, getPickupLocationList } from '../../services/api'
 ```
 
-- [ ] **Step 2: 改造 loadData 函数**
+- [ ] **Step 2: 新增 pickupLocations 状态**
 
-定位 `shao/pages/exchange/exchange.vue` 的 `loadData` 函数（约第 546-584 行），将整个函数替换为：
-
-```ts
-async function loadData() {
-  loading.value = true
-  try {
-    const [balanceRes, availableChannelsRes, productRes] = await Promise.all([
-      getPointBalance(),
-      getAvailableChannels(),
-      getPointProductList({ status: 'on_shelf' }),
-    ])
-    pointsBalance.value = (balanceRes as any)?.balance ?? 0
-    channelBalances.value = (balanceRes as any)?.channelBalances || []
-    globalBalance.value = (balanceRes as any)?.globalBalance ?? 0
-
-    // 用户可访问渠道 documentId 列表
-    const availableData = (availableChannelsRes as any)?.data || (availableChannelsRes as any) || []
-    const accessibleChannelIds = (Array.isArray(availableData) ? availableData : [])
-      .map((c: any) => c.documentId || c.id)
-      .filter(Boolean)
-
-    const rawList = (productRes as any)?.data?.records || (productRes as any)?.records || (productRes as any)?.data || []
-    productList.value = rawList
-      .filter((p: any) => {
-        // 商品未配渠道（全渠道商品）/ allowCrossChannel / 在可访问渠道列表内
-        const cid = p.channel?.documentId || p.channel?.id || p.channelId
-        return !cid || p.allowCrossChannel || accessibleChannelIds.includes(String(cid))
-      })
-      .map((p: any) => ({
-        id: p.id,
-        documentId: p.documentId,
-        name: p.name || '',
-        subtitle: p.subtitle || '',
-        description: p.description || '',
-        detail: p.detail || '',
-        pointsCost: p.pointsCost || 0,
-        originalPrice: p.originalPrice || 0,
-        stock: p.stock ?? 0,
-        deliveryType: p.deliveryType || 'express',
-        category: p.category || '',
-        coverImageUrl: getMediaUrl(p.coverImage),
-        imagesList: (p.images || []).map((img: any) => getMediaUrl(img)),
-        maxPerUser: p.maxPerUser || 0,
-        salesMode: p.salesMode || 'points_only',
-        price: parseFloat(p.price) || 0,
-        channelId: p.channel?.documentId || p.channel?.id || p.channelId || '',
-        allowCrossChannel: p.allowCrossChannel || false,
-        allowGlobalPoints: p.allowGlobalPoints !== false,
-      }))
-  } catch (e) {
-    console.error('加载数据失败', e)
-  } finally {
-    loading.value = false
-  }
-}
-```
-
-**关键改动**：
-1. `Promise.all` 增加 `getAvailableChannels()`
-2. 解析 `accessibleChannelIds`（兼容 `data` 字段或直接数组）
-3. `rawList.filter(...)` 前端二次过滤
-4. `channelId` 字段优先取 `documentId`（与 pickup-locations 接口兼容）
-
-- [ ] **Step 3: 验证无 TS 错误**
-
-Run:
-```bash
-cd e:\code\shao && npx tsc --noEmit -p tsconfig.json 2>&1 | head -30
-```
-Expected: 无新增错误。
-
-- [ ] **Step 4: 提交**
-
-shao 目录在 git 仓库外，跳过 commit。
-
----
-
-### Task 3: exchange.vue 新增 pickupLocations 状态与 loadPickupLocations 函数
-
-**Files:**
-- Modify: `shao/pages/exchange/exchange.vue`（状态定义区 + 函数区）
-
-- [ ] **Step 1: 新增 pickupLocations 状态**
-
-定位 `shao/pages/exchange/exchange.vue` 的状态定义区（约第 313-333 行，`const loading = ref(false)` 之后），新增：
-
-```ts
-const pickupLocations = ref<any[]>([])
-```
-
-完整上下文（在第 322 行 `const phoneFocus = ref(false)` 之后新增一行）：
+定位 `shao/pages/exchange/exchange.vue` 的状态定义区（约第 313-333 行，`const phoneFocus = ref(false)` 之后），新增一行：
 
 ```ts
 const nameFocus = ref(false)
 const phoneFocus = ref(false)
 const pickupLocations = ref<any[]>([])
-```
-
-- [ ] **Step 2: 修改 import 语句引入 getPickupLocationList**
-
-定位 `shao/pages/exchange/exchange.vue:266`，当前 import 语句为：
-
-```ts
-import { getPointBalance, getPointProductList, redeemPoints, getAvailableChannels } from '../../services/api'
-```
-
-改为：
-
-```ts
-import { getPointBalance, getPointProductList, redeemPoints, getAvailableChannels, getPickupLocationList } from '../../services/api'
 ```
 
 - [ ] **Step 3: 新增 loadPickupLocations 函数**
@@ -216,10 +374,10 @@ Expected: 无新增错误。
 
 ---
 
-### Task 4: exchange.vue 改造 showProductDetail 加自提点兜底逻辑
+### Task 6: exchange.vue 改造 showProductDetail 加自提点兜底逻辑
 
 **Files:**
-- Modify: `shao/pages/exchange/exchange.vue:586-628`（showProductDetail）
+- Modify: `shao/pages/exchange/exchange.vue:586-628`
 
 - [ ] **Step 1: 改造 showProductDetail 函数**
 
@@ -304,10 +462,10 @@ Expected: 无新增错误。
 
 ---
 
-### Task 5: exchange.vue 调整 showPickup / canConfirm computed
+### Task 7: exchange.vue 调整 showPickup / canConfirm computed
 
 **Files:**
-- Modify: `shao/pages/exchange/exchange.vue:384-392`（showPickup）与 `500-516`（canConfirm）
+- Modify: `shao/pages/exchange/exchange.vue:384-392` 与 `500-516`
 
 - [ ] **Step 1: 调整 showPickup computed**
 
@@ -362,44 +520,14 @@ Expected: 无新增错误。
 
 ---
 
-### Task 6: exchange.vue 改造自提点 UI 为内联单选列表
+### Task 8: exchange.vue 改造自提点 UI 为内联单选列表
 
 **Files:**
-- Modify: `shao/pages/exchange/exchange.vue:217-241`（pickup-info 模板块）与 `379-382`（selectPickupLocation 函数）
+- Modify: `shao/pages/exchange/exchange.vue:217-241` 与 `379-382`
 
 - [ ] **Step 1: 改造自提点 UI 模板块**
 
-定位 `shao/pages/exchange/exchange.vue:217-241` 的整个 `<!-- 自提信息 -->` 区块：
-
-```html
-              <!-- 自提信息 -->
-              <view v-if="form.deliveryType === 'self_pickup'" class="pickup-info">
-                <view class="pickup-tip">
-                  <text>请前往指定地点自提，工作人员将核实您的兑换信息</text>
-                </view>
-                <view class="form-item" @click="selectPickupLocation">
-                  <text class="form-label">选择自提点</text>
-                  <view class="pickup-location-select">
-                    <text :class="['pickup-location-text', { placeholder: !form.pickupLocationName }]">
-                      {{ form.pickupLocationName || '请选择自提点（可选）' }}
-                    </text>
-                    <text class="pickup-location-arrow">></text>
-                  </view>
-                </view>
-                <view class="form-item">
-                  <view class="form-label-row">
-                    <text class="form-label">联系电话 <text class="required">*</text></text>
-                    <view class="form-actions" v-if="form.receiverPhone">
-                      <text class="action-btn" @click="form.receiverPhone = ''">清空电话</text>
-                    </view>
-                  </view>
-                  <input class="form-input" v-model="form.receiverPhone" placeholder="请输入11位手机号（用于核实身份）" type="number" maxlength="11" :focus="phoneFocus" @blur="phoneFocus = false" />
-                  <text class="form-error" v-if="form.receiverPhone && !isValidPhone(form.receiverPhone)">请输入正确的11位手机号（1开头）</text>
-                </view>
-              </view>
-```
-
-替换为：
+定位 `shao/pages/exchange/exchange.vue:217-241` 的整个 `<!-- 自提信息 -->` 区块，替换为：
 
 ```html
               <!-- 自提信息 -->
@@ -501,14 +629,14 @@ Expected: 无新增错误。
 
 ---
 
-### Task 7: exchange.vue 新增内联单选列表样式
+### Task 9: exchange.vue 新增内联单选列表样式
 
 **Files:**
-- Modify: `shao/pages/exchange/exchange.vue`（`<style>` 区块末尾，约第 970 行附近）
+- Modify: `shao/pages/exchange/exchange.vue`（`<style>` 区块末尾）
 
 - [ ] **Step 1: 在 `<style lang="scss" scoped>` 末尾新增样式**
 
-定位 `shao/pages/exchange/exchange.vue` 的 `<style>` 区块末尾（`</style>` 之前，约第 970 行），新增：
+定位 `shao/pages/exchange/exchange.vue` 的 `<style>` 区块末尾（`</style>` 之前），新增：
 
 ```scss
 /* 内联自提点单选列表 */
@@ -578,38 +706,32 @@ Expected: 无新增错误。
 }
 ```
 
-- [ ] **Step 2: 验证无 SCSS 编译错误**
-
-如有构建命令可执行：
-```bash
-cd e:\code\shao && npm run build 2>&1 | tail -20
-```
-Expected: 构建成功（uni-app 构建可能耗时较长，可选步骤）。
-
 ---
 
-### Task 8: 浏览器验证
+### Task 10: 重启 Strapi 并浏览器验证
 
 **Files:**
 - 无文件改动，仅运行时验证
 
-- [ ] **Step 1: 启动 shao 开发服务器**
+- [ ] **Step 1: 重启 Strapi**
 
-如未启动，运行：
+停止当前 Strapi 进程，在 `e:\code\basic` 重新启动：
+
 ```bash
-cd e:\code\shao && npm run dev:h5
+cd e:\code\basic && npm run develop
 ```
-Expected: 服务启动，访问 `http://localhost:5175/`。
+Expected: Strapi 启动成功，加载 zhao-common 与 zhao-point 新构建产物。
 
-- [ ] **Step 2: 验证商品列表过滤**
+- [ ] **Step 2: 验证商品列表渠道过滤**
 
 操作：
 1. 登录后访问 `http://localhost:5175/#/pages/exchange/exchange`
 2. 检查商品列表
 
 Expected:
-- 仅显示：全渠道商品（无 channelId）/ allowCrossChannel 商品 / 商品渠道在用户可访问渠道列表内的商品
-- 不显示其他渠道的私有商品
+- 仅显示：全渠道商品 / allowCrossChannel 商品 / 商品渠道在 available channels（site ∪ user）内的商品
+- 商品列表无重复项
+- site channels 关联的商品也能显示（增量验证）
 
 - [ ] **Step 3: 验证自提点兜底（0 个自提点）**
 
@@ -653,26 +775,44 @@ Expected:
 - 兑换成功
 - 接口请求体中 `pickupLocationId` 正确传递
 
+- [ ] **Step 7: 验证 /channels/available 接口仍正常（回归）**
+
+操作：
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:1337/api/zhao-common/v1/channels/available
+```
+Expected: 返回 `{ data: [{ id, documentId, name }, ...] }`，与改造前一致。
+
 ---
 
 ## Self-Review
 
 **1. Spec coverage:**
-- 3.1 商品列表过滤 → Task 1 (api.ts) + Task 2 (loadData) ✓
-- 3.2 兑换弹窗自提点逻辑 → Task 3 (loadPickupLocations) + Task 4 (showProductDetail) ✓
-- 3.3 UI 内联单选 → Task 6 (template + selectPickupLocation) ✓
-- 3.4 配送方式可选性 → Task 5 (showPickup / canConfirm) ✓
-- 3.5 样式 → Task 7 ✓
-- 5 边界情况 → Task 4 (无 channelId 不拉取) + Task 5 (length=0 隐藏) ✓
-- 7 验收标准 → Task 8 全覆盖 ✓
+- 3.1 改动范围 → Task 1-4（后端）+ Task 5-9（前端）✓
+- 3.2 zhao-common service 方法 → Task 1 ✓
+- 3.3 controller 重构 → Task 2 ✓
+- 3.4 getProducts 改造 → Task 4 ✓
+- 3.5 controller 传入 siteId → Task 3 ✓
+- 3.6 前端 loadData 简化 → 实际无需改动（原 loadData 已直接 map，无前端过滤；spec 3.6 是说明前端不再加过滤，原代码已满足）✓
+- 3.7 兑换弹窗自提点逻辑 → Task 5 (loadPickupLocations) + Task 6 (showProductDetail) ✓
+- 3.8 UI 内联单选 → Task 8 ✓
+- 3.9 配送方式可选性 → Task 7 ✓
+- 3.10 样式 → Task 9 ✓
+- 5 边界情况 → Task 6 (无 channelId 不拉取) + Task 7 (length=0 隐藏) + Task 4 (siteId 缺失兜底) ✓
+- 7 验收标准 → Task 10 全覆盖 ✓
 
-**2. Placeholder scan:** 无 TBD/TODO/"implement later"，所有代码块完整。
+**2. Placeholder scan:** 无 TBD/TODO，所有代码块完整。
 
 **3. Type consistency:**
-- `pickupLocations: ref<any[]>` 在 Task 3 定义，Task 4/5/6 使用一致 ✓
-- `loadPickupLocations(channelId: string)` 在 Task 3 定义，Task 4 调用一致 ✓
-- `selectPickupLocation(loc: any)` 在 Task 6 改造，template 中 `@click="selectPickupLocation(loc)"` 一致 ✓
-- `getAvailableChannels` 在 Task 1 定义，Task 2 import 使用 ✓
-- `getPickupLocationList` 在 Task 3 import，loadPickupLocations 调用 ✓
+- `getAvailableChannels(siteId?, userId?)` 在 Task 1 定义，Task 2/4 调用一致 ✓
+- `getProducts({ siteId, ... })` 在 Task 4 定义，Task 3 controller 调用一致 ✓
+- `pickupLocations: ref<any[]>` 在 Task 5 定义，Task 6/7/8 使用一致 ✓
+- `loadPickupLocations(channelId: string)` 在 Task 5 定义，Task 6 调用一致 ✓
+- `selectPickupLocation(loc: any)` 在 Task 8 改造，template 中 `@click="selectPickupLocation(loc)"` 一致 ✓
+
+**4. 关于 spec 3.6 前端 loadData 简化的说明：**
+spec 3.6 描述的是"前端不再做二次过滤"，但原 exchange.vue 的 loadData 本来就没有前端过滤逻辑（直接 map 展示）。spec 3.6 的代码块与原代码基本一致，仅 channelId 字段优先取 documentId。需在 Task 5 或单独 Task 中确认原 loadData 的 channelId 映射正确。
+
+**补充检查**：Task 5-9 未涉及 loadData 改动，需确认原 loadData 的 channelId 映射已优先取 documentId。如未取，需在 Task 6 的 showProductDetail 中使用 `product.channel?.documentId || product.channel?.id` 兜底。但 product 是前端 Product 类型，channelId 已在 loadData 中映射。需在 Task 10 验证时确认商品 channelId 为 documentId。
 
 无问题。
