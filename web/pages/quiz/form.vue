@@ -294,7 +294,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import PageHeader from '../../src/components/PageHeader.vue'
 import TagPicker from '../../src/components/TagPicker.vue'
 import { getQuestionDetail, createQuestion, updateQuestion } from '../../src/api/quiz.js'
-import { getCourseList, getLessonList } from '../../src/api/course.js'
+import { getCourseList, getLessonList, getLessonDetail } from '../../src/api/course.js'
 
 const isEdit = ref(false)
 const questionId = ref('')
@@ -331,6 +331,9 @@ const showCoursePicker = ref(false)
 const showLessonPicker = ref(false)
 const showKnowledgePicker = ref(false)
 
+const isInitializing = ref(false)
+const lessonPointsInfo = ref(null)  // { enablePoints, pointsType, points }
+
 const courseList = ref([])
 const lessonList = ref([])
 
@@ -345,6 +348,7 @@ const answerOptions = computed(() => {
 })
 
 watch(() => form.course, async (newCourse) => {
+  if (isInitializing.value) return  // 初始化期间跳过清空
   form.lesson = null
   if (newCourse) {
     await loadLessons(newCourse.documentId)
