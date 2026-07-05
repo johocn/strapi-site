@@ -437,9 +437,31 @@ function selectCourse(course) {
   showCoursePicker.value = false
 }
 
-function selectLesson(lesson) {
+async function selectLesson(lesson) {
   form.lesson = lesson
   showLessonPicker.value = false
+  if (lesson) {
+    await loadLessonPointsInfo(lesson.documentId)
+  } else {
+    lessonPointsInfo.value = null
+  }
+}
+
+async function loadLessonPointsInfo(lessonDocId) {
+  if (!lessonDocId) {
+    lessonPointsInfo.value = null
+    return
+  }
+  try {
+    const data = await getLessonDetail(lessonDocId)
+    lessonPointsInfo.value = {
+      enablePoints: data.enablePoints ?? false,
+      pointsType: data.pointsType ?? 'lesson_points',
+      points: data.points ?? 0
+    }
+  } catch (e) {
+    lessonPointsInfo.value = null
+  }
 }
 
 function onKnowledgePointSelect(kps) {
@@ -456,6 +478,7 @@ function removeKnowledgePoint(kp) {
 async function loadQuestionDetail() {
   if (!questionId.value) return
   try {
+    isInitializing.value = true
     const data = await getQuestionDetail(questionId.value)
     Object.assign(form, data)
     // 知识点现在混在 tags 中，按 tagGroup.slug === 'knowledge-point' 过滤
@@ -483,7 +506,13 @@ async function loadQuestionDetail() {
     if (form.course) {
       await loadLessons(form.course.documentId)
     }
+    // 关联课时积分配置加载
+    if (form.lesson) {
+      await loadLessonPointsInfo(form.lesson.documentId)
+    }
+    isInitializing.value = false
   } catch (e) {
+    isInitializing.value = false
     uni.showToast({ title: '加载失败', icon: 'none' })
   }
 }
