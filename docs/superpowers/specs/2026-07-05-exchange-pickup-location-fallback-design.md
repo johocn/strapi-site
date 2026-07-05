@@ -334,6 +334,8 @@ async function showProductDetail(product: Product) {
   form.value.pickupLocationName = ''
 
   // 自提点兜底逻辑
+  // 跨渠道商品（无 channelId）不查自提点 → 自提选项隐藏（见 3.9 showPickup）
+  // 指定渠道商品按 channelId 查自提点：0 → 强制快递 / 1 → 自动选中 / >1 → 等用户选
   pickupLocations.value = []
   if (showPickup.value && product.channelId) {
     await loadPickupLocations(product.channelId)
@@ -347,6 +349,10 @@ async function showProductDetail(product: Product) {
       form.value.pickupLocationId = ''
       form.value.pickupLocationName = ''
     }
+  } else if (showPickup.value && !product.channelId) {
+    // 跨渠道商品无指定渠道：清空自提点，强制快递
+    pickupLocations.value = []
+    form.value.deliveryType = 'express'
   }
 
   // ... 自动选中渠道积分逻辑不变
@@ -413,7 +419,10 @@ function selectPickupLocation(loc: any) {
 const showPickup = computed(() => {
   const dt = selectedProduct.value?.deliveryType
   if (!(dt === 'self_pickup' || dt === 'both')) return false
-  if (selectedProduct.value?.channelId && pickupLocations.value.length === 0) return false
+  // 跨渠道商品（无 channelId）不显示自提选项
+  if (!selectedProduct.value?.channelId) return false
+  // 指定渠道商品但自提点为 0 时不显示自提选项
+  if (pickupLocations.value.length === 0) return false
   return true
 })
 
@@ -475,9 +484,9 @@ const canConfirm = computed(() => {
 
 | 场景 | 处理 |
 |------|------|
-| 商品 `channelId` 为空（全渠道商品） | 不拉取自提点，保持原"请选择自提点（可选）"行为 |
+| 跨渠道商品（`channelId` 为空） | 不拉取自提点，自提选项隐藏，强制快递 |
 | 商品 `deliveryType` 不含 `self_pickup` | 不拉取自提点，仅显示快递选项 |
-| `loadPickupLocations` 失败 | `pickupLocations.value = []`，按 0 个处理 |
+| `loadPickupLocations` 失败 | `pickupLocations.value = []`，按 0 个处理（自提选项隐藏） |
 | 用户切换 `deliveryType` 为 express | 不影响已选自提点（提交时若 express 则忽略 pickupLocationId） |
 | siteId 缺失（未识别租户） | getProducts 退回 user channels 查询（兜底） |
 | available channels 为空 | 仅显示 allowCrossChannel 商品 |
@@ -496,8 +505,8 @@ const canConfirm = computed(() => {
 1. 商品列表仅显示：全渠道商品 / allowCrossChannel 商品 / 商品渠道在 available channels（site ∪ user）内的商品
 2. 商品列表无重复项（manyToOne schema 决定）
 3. 点击兑换按钮：
-   - 商品无自提点 → 自提选项隐藏
-   - 商品有 1 个自提点 → 自动选中，自提选项可见
-   - 商品有多个自提点 → 显示内联单选列表，未选时无法确认
+   - 跨渠道商品（无 channelId）→ 自提选项隐藏，仅显示快递
+   - 指定渠道商品无自提点 → 自提选项隐藏，仅显示快递
+   - 指定渠道商品有 1 个自提点 → 自动选中，自提选项可见
+   - 指定渠道商品有多个自提点 → 显示内联单选列表，未选时无法确认
 4. 提交兑换时 pickupLocationId 正确传递
-5. 全渠道商品（无 channelId）保持原有"可选自提点"行为不破坏
