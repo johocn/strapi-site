@@ -194,9 +194,18 @@
       <!-- 渠道配置 -->
       <view class="form-section-title">渠道配置</view>
       <view class="form-card">
+        <view class="form-item switch-item">
+          <view>
+            <text class="form-label">跨渠道总开关</text>
+            <text class="form-hint">由租户管理员配置，此处不可修改</text>
+          </view>
+          <view :class="['readonly-badge', form.channelUsage !== 'site_only' ? 'enabled' : 'disabled']">
+            {{ form.channelUsage !== 'site_only' ? '已开启' : '已关闭' }}
+          </view>
+        </view>
         <view class="form-item switch-item" v-if="isFieldVisible('allowCrossChannel')">
           <text class="form-label">跨渠道访问</text>
-          <switch :checked="form.allowCrossChannel" @change="form.allowCrossChannel = $event.detail.value" :disabled="!isFieldEditable('allowCrossChannel')" color="#07c160" />
+          <switch :checked="form.allowCrossChannel" @change="form.allowCrossChannel = $event.detail.value" :disabled="!isFieldEditable('allowCrossChannel') || form.channelUsage === 'site_only'" color="#07c160" />
         </view>
         <view class="form-item switch-item" v-if="isFieldVisible('channelInviteEnabled')">
           <text class="form-label">渠道邀请</text>
@@ -492,6 +501,7 @@ const form = ref({
   registerEnabled: true,
   inviteCodeRequired: false,
   allowCrossChannel: false,
+  channelUsage: 'site_cross_user',
   channelInviteEnabled: true,
   defaultChannelScope: 'all',
   signInPoints: 10,
@@ -584,6 +594,7 @@ async function loadConfig() {
         registerEnabled: data.registerEnabled ?? true,
         inviteCodeRequired: data.inviteCodeRequired ?? false,
         allowCrossChannel: data.allowCrossChannel ?? false,
+        channelUsage: data.channelUsage ?? 'site_cross_user',
         channelInviteEnabled: data.channelInviteEnabled ?? true,
         defaultChannelScope: data.defaultChannelScope ?? 'all',
         signInPoints: data.signInPoints ?? 10,
@@ -765,6 +776,20 @@ page { background: #f5f5f5; }
 
 .form-card {
   background: #fff; border-radius: 12rpx; padding: 24rpx; margin-bottom: 16rpx;
+}
+
+.readonly-badge {
+  padding: 8rpx 20rpx;
+  border-radius: 20rpx;
+  font-size: 24rpx;
+  &.enabled {
+    background: #f0f9eb;
+    color: #67c23a;
+  }
+  &.disabled {
+    background: #fef0f0;
+    color: #f56c6c;
+  }
 }
 
 .form-item { margin-bottom: 24rpx; }
