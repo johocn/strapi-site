@@ -1,0 +1,417 @@
+{
+  "pages": [
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/register/index",
+      "style": {
+        "navigationBarTitleText": "渠道邀请码注册",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/dashboard/index",
+      "style": {
+        "navigationBarTitleText": "控制台"
+      }
+    },
+    {
+      "path": "pages/channel/list",
+      "style": {
+        "navigationBarTitleText": "渠道管理"
+      }
+    },
+    {
+      "path": "pages/channel/detail",
+      "style": {
+        "navigationBarTitleText": "渠道详情"
+      }
+    },
+    {
+      "path": "pages/channel/members",
+      "style": {
+        "navigationBarTitleText": "渠道成员"
+      }
+    },
+    {
+      "path": "pages/channel/network",
+      "style": {
+        "navigationBarTitleText": "渠道网络"
+      }
+    },
+    {
+      "path": "pages/tenant/list",
+      "style": {
+        "navigationBarTitleText": "租户管理"
+      }
+    },
+    {
+      "path": "pages/tenant/detail",
+      "style": {
+        "navigationBarTitleText": "租户配置"
+      }
+    },
+    {
+      "path": "pages/quiz/list",
+      "style": {
+        "navigationBarTitleText": "题库管理"
+      }
+    },
+    {
+      "path": "pages/quiz/form",
+      "style": {
+        "navigationBarTitleText": "题目编辑"
+      }
+    },
+    {
+      "path": "pages/quiz/batch-upload",
+      "style": {
+        "navigationBarTitleText": "批量导入"
+      }
+    },
+    {
+      "path": "pages/quiz/record/list",
+      "style": {
+        "navigationBarTitleText": "答题记录"
+      }
+    },
+    {
+      "path": "pages/quiz/record/detail",
+      "style": {
+        "navigationBarTitleText": "答题详情"
+      }
+    },
+    {
+      "path": "pages/quiz/exam/list",
+      "style": {
+        "navigationBarTitleText": "考试管理"
+      }
+    },
+    {
+      "path": "pages/quiz/exam/form",
+      "style": {
+        "navigationBarTitleText": "考试编辑"
+      }
+    },
+    {
+      "path": "pages/points/types",
+      "style": {
+        "navigationBarTitleText": "积分类型"
+      }
+    },
+    {
+      "path": "pages/points/rules",
+      "style": {
+        "navigationBarTitleText": "积分规则"
+      }
+    },
+    {
+      "path": "pages/points/records",
+      "style": {
+        "navigationBarTitleText": "积分记录"
+      }
+    },
+    {
+      "path": "pages/points/products",
+      "style": {
+        "navigationBarTitleText": "积分产品"
+      }
+    },
+    {
+      "path": "pages/points/exchanges",
+      "style": {
+        "navigationBarTitleText": "兑换记录"
+      }
+    },
+    {
+      "path": "pages/points/pickup-verify",
+      "style": {
+        "navigationBarTitleText": "扫码兑付"
+      }
+    },
+    {
+      "path": "pages/points/pickup-locations",
+      "style": {
+        "navigationBarTitleText": "自提点管理"
+      }
+    },
+    {
+      "path": "pages/points/statistics",
+      "style": {
+        "navigationBarTitleText": "积分统计"
+      }
+    },
+    {
+      "path": "pages/points/config",
+      "style": {
+        "navigationBarTitleText": "积分配置"
+      }
+    },
+
+    {
+      "path": "pages/course/list",
+      "style": {
+        "navigationBarTitleText": "课程管理"
+      }
+    },
+    {
+      "path": "pages/course/form",
+      "style": {
+        "navigationBarTitleText": "课程编辑"
+      }
+    },
+    {
+      "path": "pages/course/detail",
+      "style": {
+        "navigationBarTitleText": "课程详情"
+      }
+    },
+    {
+      "path": "pages/course/lesson/list",
+      "style": {
+        "navigationBarTitleText": "课时管理"
+      }
+    },
+    {
+      "path": "pages/course/lesson/form",
+      "style": {
+        "navigationBarTitleText": "课时编辑"
+      }
+    },
+    {
+      "path": "pages/course/lesson/detail",
+      "style": {
+        "navigationBarTitleText": "课时详情"
+      }
+    },
+    {
+      "path": "pages/course/category/list",
+      "style": {
+        "navigationBarTitleText": "课程分类"
+      }
+    },
+    {
+      "path": "pages/course/category/form",
+      "style": {
+        "navigationBarTitleText": "分类编辑"
+      }
+    },
+    {
+      "path": "pages/course/tag/list",
+      "style": {
+        "navigationBarTitleText": "课程标签"
+      }
+    },
+    {
+      "path": "pages/course/tag/form",
+      "style": {
+        "navigationBarTitleText": "标签编辑"
+      }
+    },
+    {
+      "path": "pages/course/auth/list",
+      "style": {
+        "navigationBarTitleText": "用户课程授权"
+      }
+    },
+    {
+      "path": "pages/study/progress",
+      "style": {
+        "navigationBarTitleText": "课程学习进度"
+      }
+    },
+    {
+      "path": "pages/study/lesson-progress",
+      "style": {
+        "navigationBarTitleText": "课时学习进度"
+      }
+    },
+    {
+      "path": "pages/distribution/invites",
+      "style": {
+        "navigationBarTitleText": "分销邀请"
+      }
+    },
+    {
+      "path": "pages/verification/records",
+      "style": {
+        "navigationBarTitleText": "验证记录"
+      }
+    },
+    {
+      "path": "pages/media/list",
+      "style": {
+        "navigationBarTitleText": "媒体资源"
+      }
+    },
+
+    {
+      "path": "pages/settings/site-config",
+      "style": {
+        "navigationBarTitleText": "站点配置"
+      }
+    },
+    {
+      "path": "pages/settings/site-template",
+      "style": {
+        "navigationBarTitleText": "模板管理"
+      }
+    },
+    {
+      "path": "pages/redemption/codes",
+      "style": {
+        "navigationBarTitleText": "兑换码"
+      }
+    },
+    {
+      "path": "pages/redemption/records",
+      "style": {
+        "navigationBarTitleText": "兑换记录"
+      }
+    },
+    {
+      "path": "pages/system/tools",
+      "style": {
+        "navigationBarTitleText": "系统工具"
+      }
+    },
+    {
+      "path": "pages/system/profile",
+      "style": {
+        "navigationBarTitleText": "个人中心"
+      }
+    },
+    {
+      "path": "pages/system/user-roles",
+      "style": {
+        "navigationBarTitleText": "用户角色管理"
+      }
+    },
+    {
+      "path": "pages/system/role-management",
+      "style": {
+        "navigationBarTitleText": "角色管理"
+      }
+    },
+    {
+      "path": "pages/system/role-logs",
+      "style": {
+        "navigationBarTitleText": "角色操作日志"
+      }
+    },
+    {
+      "path": "pages/system/permissions",
+      "style": {
+        "navigationBarTitleText": "权限管理"
+      }
+    },
+    {
+      "path": "pages/oss/dashboard",
+      "style": {
+        "navigationBarTitleText": "OSS 同步仪表盘"
+      }
+    },
+    {
+      "path": "pages/oss/records",
+      "style": {
+        "navigationBarTitleText": "OSS 同步记录"
+      }
+    },
+    {
+      "path": "pages/oss/settings",
+      "style": {
+        "navigationBarTitleText": "OSS 存储设置"
+      }
+    },
+    {
+      "path": "pages/third/config-list",
+      "style": {
+        "navigationBarTitleText": "第三方配置"
+      }
+    },
+    {
+      "path": "pages/third/config-form",
+      "style": {
+        "navigationBarTitleText": "第三方配置编辑"
+      }
+    },
+    {
+      "path": "pages/third/accounts",
+      "style": {
+        "navigationBarTitleText": "第三方账号"
+      }
+    },
+    {
+      "path": "pages/tag/list",
+      "style": {
+        "navigationBarTitleText": "标签管理"
+      }
+    },
+    {
+      "path": "pages/tag/form",
+      "style": {
+        "navigationBarTitleText": "标签编辑"
+      }
+    },
+    {
+      "path": "pages/tag/groups",
+      "style": {
+        "navigationBarTitleText": "标签分组"
+      }
+    },
+    {
+      "path": "pages/tag/presets",
+      "style": {
+        "navigationBarTitleText": "分类预设"
+      }
+    },
+    {
+      "path": "pages/tag/search",
+      "style": {
+        "navigationBarTitleText": "全局标签检索"
+      }
+    },
+    {
+      "path": "pages/tag/knowledge",
+      "style": {
+        "navigationBarTitleText": "知识点管理"
+      }
+    },
+    {
+      "path": "pages/tag/knowledge-form",
+      "style": {
+        "navigationBarTitleText": "知识点编辑"
+      }
+    },
+    {
+      "path": "pages/manual/index",
+      "style": {
+        "navigationBarTitleText": "使用手册"
+      }
+    },
+    {
+      "path": "pages/manual/viewer",
+      "style": {
+        "navigationBarTitleText": "文档查看"
+      }
+    },
+    {
+      "path": "pages/manual/search",
+      "style": {
+        "navigationBarTitleText": "搜索文档"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "TAdmin",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f5f5f5"
+  },
+  "uniIdRouter": {}
+}
