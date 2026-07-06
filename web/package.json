@@ -1,0 +1,52 @@
+{
+    "id": "tadmin",
+    "name": "tadmin",
+    "displayName": "TAdmin",
+    "version": "1.0.0",
+    "description": "UniApp Vue3 + Vant H5 Admin for Strapi",
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "jz-h5-scancode": "^1.1.0",
+        "markdown-it": "^14.3.0",
+        "pinia": "^2.1.7",
+        "vue": "^3.4.21"
+    },
+    "engines": {
+        "HBuilderX": "^3.99"
+    },
+    "uni_modules": {
+        "dependencies": [],
+        "platforms": {
+            "cloud": {
+                "tcb": "y",
+                "aliyun": "y"
+            },
+            "client": {
+                "App": {
+                    "app-vue": "y",
+                    "app-nvue": "n",
+                    "app-uvue": "n"
+                },
+                "H5-mobile": {
+                    "Safari": "y",
+                    "Android Browser": "y",
+                    "微信浏览器(Android)": "y"
+                },
+                "H5-pc": {
+                    "Chrome": "y",
+                    "Edge": "y",
+                    "Firefox": "y",
+                    "Safari": "y"
+                },
+                "小程序": {
+                    "微信": "n"
+                },
+                "Vue": {
+                    "vue2": "n",
+                    "vue3": "y"
+                }
+            }
+        }
+    }
+}
