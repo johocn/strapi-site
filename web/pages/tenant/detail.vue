@@ -173,7 +173,16 @@
           <text class="section-title">渠道配置</text>
           <text class="section-hint">必选（只能选择你有权限的渠道）</text>
         </view>
-        
+
+        <view class="form-item switch-item">
+          <view>
+            <text class="form-label">是否允许跨渠道</text>
+            <text class="form-hint" v-if="formData.channelUsage !== 'site_only'">开启后，用户可见跨渠道课程/分类，且可使用个人渠道数据</text>
+            <text class="form-hint" v-else>关闭后，仅展示站点渠道数据，跨渠道内容全部屏蔽</text>
+          </view>
+          <switch :checked="formData.channelUsage !== 'site_only'" @change="toggleChannelUsage" color="#07c160" />
+        </view>
+
         <view class="channel-list">
           <view 
             v-for="channel in selectedChannels" 
@@ -453,7 +462,7 @@ const SCHEMA_FIELDS = new Set([
   'siteName', 'siteDescription', 'logo', 'favicon', 'icpNumber',
   'seoKeywords', 'seoDescription', 'tencentMapKey', 'shareTitle',
   'shareDescription', 'shareImage', 'customerServiceUrl',
-  'featureFlags', 'domain', 'template', 'themeConfig',
+  'featureFlags', 'domain', 'template', 'themeConfig', 'channelUsage',
   'channels', 'extraConfig',
   'documentId', 'id', 'createdAt', 'updatedAt', 'publishedAt',
   'createdBy', 'updatedBy', 'locale', '_meta',
@@ -593,6 +602,7 @@ const formData = reactive({
   shareImageUrl: '',
   sharePath: '/pages/index/index',
   channels: [],
+  channelUsage: 'site_cross_user',
   featureFlags: {
     sso: false,
     points: true,
@@ -688,7 +698,8 @@ async function loadTenantDetail() {
       shareTitle: data.shareTitle || '',
       shareDescription: data.shareDescription || '',
       sharePath: data.sharePath || '/pages/index/index',
-      featureFlags: data.featureFlags ?? formData.featureFlags
+      featureFlags: data.featureFlags ?? formData.featureFlags,
+      channelUsage: data.channelUsage || 'site_cross_user'
     })
     // 回填认证配置（按字段取默认值，避免覆盖 extraConfig 中其他字段）
     formData.authConfig = {
@@ -797,6 +808,10 @@ function toggleChannelSelection(channel) {
   } else {
     selectedChannels.value.push(channel)
   }
+}
+
+function toggleChannelUsage(e: any) {
+  formData.channelUsage = e.detail.value ? 'site_cross_user' : 'site_only'
 }
 
 function removeChannel(channelId) {
@@ -990,6 +1005,7 @@ async function saveTenant(goBack = false) {
     sharePath: formData.sharePath,
     channels: selectedChannels.value.map(ch => ch.documentId || ch.id),
     featureFlags: formData.featureFlags,
+    channelUsage: formData.channelUsage,
     ...mergedExtraConfig,
     template: currentTemplate.value?.documentId ?? null,
     themeConfig: JSON.stringify(themeConfig.value)
