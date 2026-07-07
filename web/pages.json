@@ -423,7 +423,19 @@
       "style": {
         "navigationBarTitleText": "线索管理"
       }
-    }
+    },
+    { "path": "pages/website/product/list", "style": { "navigationBarTitleText": "产品方案" } },
+    { "path": "pages/website/product/edit", "style": { "navigationBarTitleText": "产品编辑" } },
+    { "path": "pages/website/case/list", "style": { "navigationBarTitleText": "落地案例" } },
+    { "path": "pages/website/case/edit", "style": { "navigationBarTitleText": "案例编辑" } },
+    { "path": "pages/website/faq/list", "style": { "navigationBarTitleText": "常见问答" } },
+    { "path": "pages/website/faq/edit", "style": { "navigationBarTitleText": "问答编辑" } },
+    { "path": "pages/website/tutorial/list", "style": { "navigationBarTitleText": "教程指南" } },
+    { "path": "pages/website/tutorial/edit", "style": { "navigationBarTitleText": "教程编辑" } },
+    { "path": "pages/website/compliance/list", "style": { "navigationBarTitleText": "合规公示" } },
+    { "path": "pages/website/compliance/edit", "style": { "navigationBarTitleText": "合规编辑" } },
+    { "path": "pages/website/download/list", "style": { "navigationBarTitleText": "下载管理" } },
+    { "path": "pages/website/download/edit", "style": { "navigationBarTitleText": "下载编辑" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
