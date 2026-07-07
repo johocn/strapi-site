@@ -405,6 +405,24 @@
       "style": {
         "navigationBarTitleText": "搜索文档"
       }
+    },
+    {
+      "path": "pages/website/article/list",
+      "style": {
+        "navigationBarTitleText": "资讯文章"
+      }
+    },
+    {
+      "path": "pages/website/article/edit",
+      "style": {
+        "navigationBarTitleText": "文章编辑"
+      }
+    },
+    {
+      "path": "pages/website/lead/list",
+      "style": {
+        "navigationBarTitleText": "线索管理"
+      }
     }
   ],
   "globalStyle": {
