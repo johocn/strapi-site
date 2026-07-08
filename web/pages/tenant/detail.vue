@@ -810,7 +810,7 @@ function toggleChannelSelection(channel) {
   }
 }
 
-function toggleChannelUsage(e: any) {
+function toggleChannelUsage(e) {
   formData.channelUsage = e.detail.value ? 'site_cross_user' : 'site_only'
 }
 
