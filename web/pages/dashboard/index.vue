@@ -415,13 +415,15 @@ import { getCourseList, getUserCourseList, getCourseProgressList } from '../../s
 import { getQuestionList } from '../../src/api/quiz.js'
 import { getRecordList } from '../../src/api/points.js'
 import { loadSiteConfig } from '../../src/utils/config-helper.js'
+import { articleApi, productApi, caseApi, leadApi } from '../../src/api/website.js'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
-const stats = ref({ channels: 0, courses: 0, questions: 0, points: 0, students: 0, completedCourses: 0 })
+const stats = ref({ channels: 0, courses: 0, questions: 0, points: 0, students: 0, completedCourses: 0, articles: 0, products: 0, cases: 0, leads: 0 })
 const courseStatusMap = ref({})
 const recentProgress = ref([])
 const pointsEnabled = ref(true)
+const websiteEnabled = ref(true)
 
 const courseStatusData = computed(() => {
   const statusConfig = [
@@ -510,6 +512,7 @@ onShow(async () => {
       const config = await loadSiteConfig()
       if (config) {
         pointsEnabled.value = config.featureFlags?.points !== false
+        websiteEnabled.value = config.featureFlags?.website !== false
       }
     } catch {}
     loadStats()
