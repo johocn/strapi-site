@@ -89,7 +89,7 @@
     </view>
 
     <!-- 官网中心 -->
-    <view class="module-section" v-if="hasPermission('menu.website-center')">
+    <view class="module-section" v-if="websiteEnabled && hasPermission('menu.website-center')">
       <view class="section-title">🌐 官网中心</view>
       <view class="module-grid">
         <view class="module-item" v-if="hasPermission('menu.website-seo')" @click="navigateTo('/pages/website/seo-config/edit')">
