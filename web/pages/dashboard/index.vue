@@ -88,6 +88,85 @@
       </view>
     </view>
 
+    <!-- 官网中心 -->
+    <view class="module-section" v-if="hasPermission('menu.website-center')">
+      <view class="section-title">🌐 官网中心</view>
+      <view class="module-grid">
+        <view class="module-item" v-if="hasPermission('menu.website-seo')" @click="navigateTo('/pages/website/seo-config/edit')">
+          <view class="module-icon">🔍</view>
+          <view class="module-name">SEO 配置</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-brand')" @click="navigateTo('/pages/website/brand-info/edit')">
+          <view class="module-icon">🏷️</view>
+          <view class="module-name">品牌信息</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-article')" @click="navigateTo('/pages/website/article/list')">
+          <view class="module-icon">📄</view>
+          <view class="module-name">资讯文章</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-article-category')" @click="navigateTo('/pages/website/article-category/list')">
+          <view class="module-icon">📂</view>
+          <view class="module-name">文章分类</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-product')" @click="navigateTo('/pages/website/product/list')">
+          <view class="module-icon">📦</view>
+          <view class="module-name">产品方案</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-case')" @click="navigateTo('/pages/website/case/list')">
+          <view class="module-icon">🏆</view>
+          <view class="module-name">落地案例</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-compliance')" @click="navigateTo('/pages/website/compliance/list')">
+          <view class="module-icon">📋</view>
+          <view class="module-name">合规公示</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-faq')" @click="navigateTo('/pages/website/faq/list')">
+          <view class="module-icon">❓</view>
+          <view class="module-name">常见问答</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-tutorial')" @click="navigateTo('/pages/website/tutorial/list')">
+          <view class="module-icon">📖</view>
+          <view class="module-name">教程指南</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-download')" @click="navigateTo('/pages/website/download/list')">
+          <view class="module-icon">💾</view>
+          <view class="module-name">下载管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-lead')" @click="navigateTo('/pages/website/lead/list')">
+          <view class="module-icon">📝</view>
+          <view class="module-name">线索管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-visit-log')" @click="navigateTo('/pages/website/visit-log/list')">
+          <view class="module-icon">👁️</view>
+          <view class="module-name">访问日志</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-interaction')" @click="navigateTo('/pages/website/interaction/list')">
+          <view class="module-icon">💬</view>
+          <view class="module-name">互动记录</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-search-log')" @click="navigateTo('/pages/website/search-log/list')">
+          <view class="module-icon">🔎</view>
+          <view class="module-name">搜索日志</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-knowledge-entity')" @click="navigateTo('/pages/website/knowledge-entity/list')">
+          <view class="module-icon">🧠</view>
+          <view class="module-name">知识实体</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-knowledge-relation')" @click="navigateTo('/pages/website/knowledge-relation/list')">
+          <view class="module-icon">🔗</view>
+          <view class="module-name">知识关系</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-ai-summary')" @click="navigateTo('/pages/website/ai-summary/list')">
+          <view class="module-icon">✨</view>
+          <view class="module-name">AI 摘要</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.website-first-truth')" @click="navigateTo('/pages/website/first-truth/list')">
+          <view class="module-icon">💎</view>
+          <view class="module-name">第一真值</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 课程中心 -->
     <view class="module-section" v-if="hasPermission('menu.course-center')">
       <view class="section-title">📚 课程中心</view>
@@ -234,85 +313,6 @@
         <view class="module-item" v-if="hasPermission('menu.redemption-record')" @click="navigateTo('/pages/redemption/records')">
           <view class="module-icon">📜</view>
           <view class="module-name">兑换记录</view>
-        </view>
-      </view>
-    </view>
-
-    <!-- 官网中心 -->
-    <view class="module-section" v-if="hasPermission('menu.website-center')">
-      <view class="section-title">🌐 官网中心</view>
-      <view class="module-grid">
-        <view class="module-item" v-if="hasPermission('menu.website-seo')" @click="navigateTo('/pages/website/seo-config/edit')">
-          <view class="module-icon">🔍</view>
-          <view class="module-name">SEO 配置</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-brand')" @click="navigateTo('/pages/website/brand-info/edit')">
-          <view class="module-icon">🏷️</view>
-          <view class="module-name">品牌信息</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-article')" @click="navigateTo('/pages/website/article/list')">
-          <view class="module-icon">📄</view>
-          <view class="module-name">资讯文章</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-article-category')" @click="navigateTo('/pages/website/article-category/list')">
-          <view class="module-icon">📂</view>
-          <view class="module-name">文章分类</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-product')" @click="navigateTo('/pages/website/product/list')">
-          <view class="module-icon">📦</view>
-          <view class="module-name">产品方案</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-case')" @click="navigateTo('/pages/website/case/list')">
-          <view class="module-icon">🏆</view>
-          <view class="module-name">落地案例</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-compliance')" @click="navigateTo('/pages/website/compliance/list')">
-          <view class="module-icon">📋</view>
-          <view class="module-name">合规公示</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-faq')" @click="navigateTo('/pages/website/faq/list')">
-          <view class="module-icon">❓</view>
-          <view class="module-name">常见问答</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-tutorial')" @click="navigateTo('/pages/website/tutorial/list')">
-          <view class="module-icon">📖</view>
-          <view class="module-name">教程指南</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-download')" @click="navigateTo('/pages/website/download/list')">
-          <view class="module-icon">💾</view>
-          <view class="module-name">下载管理</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-lead')" @click="navigateTo('/pages/website/lead/list')">
-          <view class="module-icon">📝</view>
-          <view class="module-name">线索管理</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-visit-log')" @click="navigateTo('/pages/website/visit-log/list')">
-          <view class="module-icon">👁️</view>
-          <view class="module-name">访问日志</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-interaction')" @click="navigateTo('/pages/website/interaction/list')">
-          <view class="module-icon">💬</view>
-          <view class="module-name">互动记录</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-search-log')" @click="navigateTo('/pages/website/search-log/list')">
-          <view class="module-icon">🔎</view>
-          <view class="module-name">搜索日志</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-knowledge-entity')" @click="navigateTo('/pages/website/knowledge-entity/list')">
-          <view class="module-icon">🧠</view>
-          <view class="module-name">知识实体</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-knowledge-relation')" @click="navigateTo('/pages/website/knowledge-relation/list')">
-          <view class="module-icon">🔗</view>
-          <view class="module-name">知识关系</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-ai-summary')" @click="navigateTo('/pages/website/ai-summary/list')">
-          <view class="module-icon">✨</view>
-          <view class="module-name">AI 摘要</view>
-        </view>
-        <view class="module-item" v-if="hasPermission('menu.website-first-truth')" @click="navigateTo('/pages/website/first-truth/list')">
-          <view class="module-icon">💎</view>
-          <view class="module-name">第一真值</view>
         </view>
       </view>
     </view>
