@@ -22,6 +22,12 @@
             <text class="arrow">▼</text>
           </view>
         </picker>
+        <picker mode="selector" :range="tagGroupOptions" @change="handleTagGroupChange">
+          <view class="filter-item">
+            <text>{{ tagGroupOptions[tagGroupIndex] }}</text>
+            <text class="arrow">▼</text>
+          </view>
+        </picker>
       </view>
     </view>
 
@@ -74,6 +80,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { articleApi } from '../../../src/api/website.js'
+import { getTagGroupList } from '../../../src/api/tag.js'
 import { useUserStore } from '../../../src/store/user.js'
 import { formatDate } from '../../../src/utils/format.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
@@ -84,6 +91,10 @@ const hasPermission = userStore.hasPermission
 const searchKeyword = ref('')
 const statusIndex = ref(0)
 const statusOptions = ['全部状态', '草稿', '已发布', '已下架']
+
+const tagGroupList = ref([])
+const tagGroupIndex = ref(0)
+const tagGroupOptions = computed(() => ['全部分组', ...tagGroupList.value.map(g => g.name)])
 
 const articleList = ref([])
 const pagination = ref({ page: 1, pageSize: 10, total: 0 })
@@ -115,6 +126,10 @@ async function loadData(page = 1) {
     if (statusIndex.value > 0) {
       params['filters[status]'] = statusReverseMap[statusIndex.value]
     }
+    if (tagGroupIndex.value > 0) {
+      const group = tagGroupList.value[tagGroupIndex.value - 1]
+      if (group?.slug) params.tagGroup = group.slug
+    }
     const { list, pagination: pg } = await articleApi.list(params)
     articleList.value = list
     pagination.value = pg
@@ -129,6 +144,18 @@ async function loadData(page = 1) {
 function handleStatusChange(e) {
   statusIndex.value = e.detail.value
   loadData(1)
+}
+
+function handleTagGroupChange(e) {
+  tagGroupIndex.value = e.detail.value
+  loadData(1)
+}
+
+async function loadTagGroups() {
+  try {
+    const { list } = await getTagGroupList({ pageSize: 100 })
+    tagGroupList.value = list
+  } catch (e) { /* ignore */ }
 }
 
 function goCreate() {
@@ -203,7 +230,10 @@ function nextPage() {
 
 const totalPages = computed(() => Math.ceil(pagination.value.total / (pagination.value.pageSize || 10)) || 1)
 
-onShow(() => loadData(1))
+onShow(() => {
+  loadTagGroups()
+  loadData(1)
+})
 </script>
 
 <style scoped>

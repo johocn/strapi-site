@@ -37,8 +37,8 @@
       <view class="form-section">
         <view class="section-title">标签</view>
         <view class="form-item">
-          <text class="form-label">标签（逗号分隔）</text>
-          <input type="text" v-model="tagsInput" placeholder="例: 常见问题,使用" class="form-input" />
+          <text class="form-label">标签</text>
+          <TagSelector v-model="form.tags" :siteId="siteId" label="标签" />
         </view>
       </view>
     </scroll-view>
@@ -51,19 +51,18 @@ import { onLoad } from '@dcloudio/uni-app'
 import { faqApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import TagSelector from '../../../src/components/TagSelector.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
+const siteId = computed(() => userStore.currentSite?.documentId || '')
 
 const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
-const tagsInput = ref('')
 
 const form = ref({
   question: '', answer: '', slug: '', order: 0, isFeatured: false, tags: [], status: 'draft',
 })
-
-function parseTags(str) { return str ? String(str).split(',').map(t => t.trim()).filter(Boolean) : [] }
 
 async function loadDetail() {
   if (!documentId.value) return
@@ -73,9 +72,8 @@ async function loadDetail() {
       form.value = {
         question: item.question || '', answer: item.answer || '', slug: item.slug || '',
         order: item.order || 0, isFeatured: item.isFeatured || false,
-        tags: item.tags || [], status: item.status || 'draft',
+        tags: (item.tags || []).map(t => t.documentId), status: item.status || 'draft',
       }
-      tagsInput.value = (item.tags || []).join(',')
     }
   } catch (e) { uni.showToast({ title: '加载失败', icon: 'none' }) }
 }
@@ -84,7 +82,7 @@ async function handleSubmit(targetStatus) {
   if (!form.value.question) { uni.showToast({ title: '请填写问题', icon: 'none' }); return }
   if (!form.value.answer) { uni.showToast({ title: '请填写答案', icon: 'none' }); return }
   const payload = {
-    ...form.value, tags: parseTags(tagsInput.value),
+    ...form.value,
     order: Number(form.value.order) || 0,
     status: targetStatus === 'published' ? 'published' : 'draft',
   }

@@ -30,7 +30,10 @@
 
       <view class="form-section">
         <view class="section-title">标签</view>
-        <view class="form-item"><text class="form-label">标签（逗号分隔）</text><input type="text" v-model="tagsInput" placeholder="例: 入门,操作" class="form-input" /></view>
+        <view class="form-item">
+          <text class="form-label">标签</text>
+          <TagSelector v-model="form.tags" :siteId="siteId" label="标签" />
+        </view>
       </view>
     </scroll-view>
   </view>
@@ -42,13 +45,14 @@ import { onLoad } from '@dcloudio/uni-app'
 import { tutorialApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import TagSelector from '../../../src/components/TagSelector.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
+const siteId = computed(() => userStore.currentSite?.documentId || '')
 
 const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
-const tagsInput = ref('')
 const stepsJson = ref('[]')
 const materialsJson = ref('[]')
 
@@ -66,7 +70,6 @@ const form = ref({
   tags: [], status: 'draft',
 })
 
-function parseTags(str) { return str ? String(str).split(',').map(t => t.trim()).filter(Boolean) : [] }
 function safeParse(str, fallback) { try { return JSON.parse(str) } catch { return fallback } }
 
 async function loadDetail() {
@@ -78,9 +81,8 @@ async function loadDetail() {
         title: item.title || '', slug: item.slug || '', description: item.description || '', coverImage: item.coverImage || '',
         steps: item.steps || [], materials: item.materials || [],
         estimatedTime: item.estimatedTime || '', difficulty: item.difficulty || 'beginner', result: item.result || '',
-        tags: item.tags || [], status: item.status || 'draft',
+        tags: (item.tags || []).map(t => t.documentId), status: item.status || 'draft',
       }
-      tagsInput.value = (item.tags || []).join(',')
       stepsJson.value = JSON.stringify(item.steps || [], null, 2)
       materialsJson.value = JSON.stringify(item.materials || [], null, 2)
     }
@@ -90,7 +92,7 @@ async function loadDetail() {
 async function handleSubmit(targetStatus) {
   if (!form.value.title) { uni.showToast({ title: '请填写标题', icon: 'none' }); return }
   const payload = {
-    ...form.value, tags: parseTags(tagsInput.value),
+    ...form.value,
     steps: safeParse(stepsJson.value, []),
     materials: safeParse(materialsJson.value, []),
     status: targetStatus === 'published' ? 'published' : 'draft',

@@ -28,7 +28,10 @@
 
       <view class="form-section">
         <view class="section-title">标签</view>
-        <view class="form-item"><text class="form-label">标签（逗号分隔）</text><input type="text" v-model="tagsInput" placeholder="例: 金融,数字化转型" class="form-input" /></view>
+        <view class="form-item">
+          <text class="form-label">标签</text>
+          <TagSelector v-model="form.tags" :siteId="siteId" label="标签" />
+        </view>
       </view>
     </scroll-view>
   </view>
@@ -40,13 +43,14 @@ import { onLoad } from '@dcloudio/uni-app'
 import { caseApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import TagSelector from '../../../src/components/TagSelector.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
+const siteId = computed(() => userStore.currentSite?.documentId || '')
 
 const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
-const tagsInput = ref('')
 const resultsJson = ref('[]')
 
 const form = ref({
@@ -55,7 +59,6 @@ const form = ref({
   coverImage: '', tags: [], status: 'draft',
 })
 
-function parseTags(str) { return str ? String(str).split(',').map(t => t.trim()).filter(Boolean) : [] }
 function safeParse(str, fallback) { try { return JSON.parse(str) } catch { return fallback } }
 
 async function loadDetail() {
@@ -68,9 +71,8 @@ async function loadDetail() {
         clientName: item.clientName || '', clientIndustry: item.clientIndustry || '', clientDescription: item.clientDescription || '',
         challenge: item.challenge || '', solution: item.solution || '', results: item.results || [],
         testimonial: item.testimonial || '', testimonialAuthor: item.testimonialAuthor || '', testimonialTitle: item.testimonialTitle || '',
-        coverImage: item.coverImage || '', tags: item.tags || [], status: item.status || 'draft',
+        coverImage: item.coverImage || '', tags: (item.tags || []).map(t => t.documentId), status: item.status || 'draft',
       }
-      tagsInput.value = (item.tags || []).join(',')
       resultsJson.value = JSON.stringify(item.results || [], null, 2)
     }
   } catch (e) { uni.showToast({ title: '加载失败', icon: 'none' }) }
@@ -82,7 +84,7 @@ async function handleSubmit(targetStatus) {
   if (!form.value.challenge) { uni.showToast({ title: '请填写挑战', icon: 'none' }); return }
   if (!form.value.solution) { uni.showToast({ title: '请填写解决方案', icon: 'none' }); return }
   const payload = {
-    ...form.value, tags: parseTags(tagsInput.value),
+    ...form.value,
     results: safeParse(resultsJson.value, []),
     status: targetStatus === 'published' ? 'published' : 'draft',
   }

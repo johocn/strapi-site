@@ -96,6 +96,15 @@ async function loadData(page = 1) {
 }
 
 function handleStatusChange(e) { statusIndex.value = e.detail.value; loadData(1) }
+function handleTagGroupChange(e) { tagGroupIndex.value = e.detail.value; loadData(1) }
+
+async function loadTagGroups() {
+  try {
+    const { list } = await getTagGroupList({ pageSize: 100 })
+    tagGroupList.value = list
+  } catch (e) { /* ignore */ }
+}
+
 function goCreate() { uni.navigateTo({ url: '/pages/website/compliance/edit' }) }
 function goEdit(id) { uni.navigateTo({ url: `/pages/website/compliance/edit?documentId=${id}` }) }
 
@@ -117,7 +126,10 @@ async function handleArchive(item) {
 
 function prevPage() { if (currentPage.value > 1) loadData(currentPage.value - 1) }
 function nextPage() { if (currentPage.value < totalPages.value) loadData(currentPage.value + 1) }
-onShow(() => loadData(1))
+onShow(() => {
+  loadTagGroups()
+  loadData(1)
+})
 </script>
 
 <style scoped>

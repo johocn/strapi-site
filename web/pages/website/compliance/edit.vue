@@ -35,7 +35,10 @@
 
       <view class="form-section">
         <view class="section-title">标签</view>
-        <view class="form-item"><text class="form-label">标签（逗号分隔）</text><input type="text" v-model="tagsInput" placeholder="例: 隐私,服务条款" class="form-input" /></view>
+        <view class="form-item">
+          <text class="form-label">标签</text>
+          <TagSelector v-model="form.tags" :siteId="siteId" label="标签" />
+        </view>
       </view>
     </scroll-view>
   </view>
@@ -47,13 +50,14 @@ import { onLoad } from '@dcloudio/uni-app'
 import { complianceApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import TagSelector from '../../../src/components/TagSelector.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
+const siteId = computed(() => userStore.currentSite?.documentId || '')
 
 const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
-const tagsInput = ref('')
 
 const categoryOptions = [
   { label: '公告', value: 'notice' },
@@ -71,8 +75,6 @@ const form = ref({
   tags: [], status: 'draft',
 })
 
-function parseTags(str) { return str ? String(str).split(',').map(t => t.trim()).filter(Boolean) : [] }
-
 async function loadDetail() {
   if (!documentId.value) return
   try {
@@ -81,9 +83,8 @@ async function loadDetail() {
       form.value = {
         title: item.title || '', slug: item.slug || '', category: item.category || 'notice',
         content: item.content || '', effectiveDate: item.effectiveDate || '', expiryDate: item.expiryDate || '',
-        isPinned: item.isPinned || false, tags: item.tags || [], status: item.status || 'draft',
+        isPinned: item.isPinned || false, tags: (item.tags || []).map(t => t.documentId), status: item.status || 'draft',
       }
-      tagsInput.value = (item.tags || []).join(',')
     }
   } catch (e) { uni.showToast({ title: '加载失败', icon: 'none' }) }
 }
@@ -92,7 +93,7 @@ async function handleSubmit(targetStatus) {
   if (!form.value.title) { uni.showToast({ title: '请填写标题', icon: 'none' }); return }
   if (!form.value.content) { uni.showToast({ title: '请填写正文', icon: 'none' }); return }
   const payload = {
-    ...form.value, tags: parseTags(tagsInput.value),
+    ...form.value,
     status: targetStatus === 'published' ? 'published' : 'draft',
   }
   try {

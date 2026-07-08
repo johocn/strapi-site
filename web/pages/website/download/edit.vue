@@ -34,7 +34,10 @@
 
       <view class="form-section">
         <view class="section-title">标签</view>
-        <view class="form-item"><text class="form-label">标签（逗号分隔）</text><input type="text" v-model="tagsInput" placeholder="例: 白皮书,产品手册" class="form-input" /></view>
+        <view class="form-item">
+          <text class="form-label">标签</text>
+          <TagSelector v-model="form.tags" :siteId="siteId" label="标签" />
+        </view>
       </view>
     </scroll-view>
   </view>
@@ -46,13 +49,14 @@ import { onLoad } from '@dcloudio/uni-app'
 import { downloadApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import TagSelector from '../../../src/components/TagSelector.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
+const siteId = computed(() => userStore.currentSite?.documentId || '')
 
 const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
-const tagsInput = ref('')
 
 const fileTypeOptions = [
   { label: '白皮书', value: 'whitepaper' },
@@ -72,8 +76,6 @@ const form = ref({
   tags: [], status: 'draft',
 })
 
-function parseTags(str) { return str ? String(str).split(',').map(t => t.trim()).filter(Boolean) : [] }
-
 async function loadDetail() {
   if (!documentId.value) return
   try {
@@ -82,9 +84,8 @@ async function loadDetail() {
       form.value = {
         name: item.name || '', description: item.description || '', file: item.file || '', fileType: item.fileType || 'other',
         order: item.order || 0, requireLead: item.requireLead !== false, isFeatured: item.isFeatured || false,
-        tags: item.tags || [], status: item.status || 'draft',
+        tags: (item.tags || []).map(t => t.documentId), status: item.status || 'draft',
       }
-      tagsInput.value = (item.tags || []).join(',')
     }
   } catch (e) { uni.showToast({ title: '加载失败', icon: 'none' }) }
 }
@@ -93,7 +94,7 @@ async function handleSubmit(targetStatus) {
   if (!form.value.name) { uni.showToast({ title: '请填写名称', icon: 'none' }); return }
   if (!form.value.file) { uni.showToast({ title: '请填写文件 URL', icon: 'none' }); return }
   const payload = {
-    ...form.value, tags: parseTags(tagsInput.value),
+    ...form.value,
     order: Number(form.value.order) || 0,
     status: targetStatus === 'published' ? 'published' : 'draft',
   }

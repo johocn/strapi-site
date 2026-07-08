@@ -13,6 +13,9 @@
         <picker mode="selector" :range="statusOptions" @change="handleStatusChange">
           <view class="filter-item"><text>{{ statusOptions[statusIndex] }}</text><text class="arrow">▼</text></view>
         </picker>
+        <picker mode="selector" :range="tagGroupOptions" @change="handleTagGroupChange">
+          <view class="filter-item"><text>{{ tagGroupOptions[tagGroupIndex] }}</text><text class="arrow">▼</text></view>
+        </picker>
       </view>
     </view>
 
@@ -57,6 +60,7 @@
 import { ref, computed } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
 import { tutorialApi } from '../../../src/api/website.js'
+import { getTagGroupList } from '../../../src/api/tag.js'
 import { useUserStore } from '../../../src/store/user.js'
 import { formatDate } from '../../../src/utils/format.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
@@ -70,6 +74,10 @@ const statusOptions = ['全部状态', '草稿', '已发布', '已下架']
 const statusReverseMap = { 1: 'draft', 2: 'published', 3: 'archived' }
 const statusMap = { draft: '草稿', published: '已发布', archived: '已下架' }
 const difficultyMap = { beginner: '入门', intermediate: '进阶', advanced: '高级' }
+
+const tagGroupList = ref([])
+const tagGroupIndex = ref(0)
+const tagGroupOptions = computed(() => ['全部分组', ...tagGroupList.value.map(g => g.name)])
 
 const itemList = ref([])
 const pagination = ref({ page: 1, pageSize: 10, total: 0 })
@@ -86,6 +94,10 @@ async function loadData(page = 1) {
     const params = { 'pagination[page]': page, 'pagination[pageSize]': 10 }
     if (searchKeyword.value) params['filters[title][$contains]'] = searchKeyword.value
     if (statusIndex.value > 0) params['filters[status]'] = statusReverseMap[statusIndex.value]
+    if (tagGroupIndex.value > 0) {
+      const group = tagGroupList.value[tagGroupIndex.value - 1]
+      if (group?.slug) params.tagGroup = group.slug
+    }
     const { list, pagination: pg } = await tutorialApi.list(params)
     itemList.value = list
     pagination.value = pg
@@ -95,6 +107,15 @@ async function loadData(page = 1) {
 }
 
 function handleStatusChange(e) { statusIndex.value = e.detail.value; loadData(1) }
+function handleTagGroupChange(e) { tagGroupIndex.value = e.detail.value; loadData(1) }
+
+async function loadTagGroups() {
+  try {
+    const { list } = await getTagGroupList({ pageSize: 100 })
+    tagGroupList.value = list
+  } catch (e) { /* ignore */ }
+}
+
 function goCreate() { uni.navigateTo({ url: '/pages/website/tutorial/edit' }) }
 function goEdit(id) { uni.navigateTo({ url: `/pages/website/tutorial/edit?documentId=${id}` }) }
 
@@ -116,7 +137,10 @@ async function handleArchive(item) {
 
 function prevPage() { if (currentPage.value > 1) loadData(currentPage.value - 1) }
 function nextPage() { if (currentPage.value < totalPages.value) loadData(currentPage.value + 1) }
-onShow(() => loadData(1))
+onShow(() => {
+  loadTagGroups()
+  loadData(1)
+})
 </script>
 
 <style scoped>

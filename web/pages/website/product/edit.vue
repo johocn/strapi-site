@@ -65,8 +65,8 @@
       <view class="form-section">
         <view class="section-title">标签</view>
         <view class="form-item">
-          <text class="form-label">标签（逗号分隔）</text>
-          <input type="text" v-model="tagsInput" placeholder="例: SaaS,企业" class="form-input" />
+          <text class="form-label">标签</text>
+          <TagSelector v-model="form.tags" :siteId="siteId" label="标签" />
         </view>
       </view>
     </scroll-view>
@@ -79,13 +79,14 @@ import { onLoad } from '@dcloudio/uni-app'
 import { productApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import TagSelector from '../../../src/components/TagSelector.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
+const siteId = computed(() => userStore.currentSite?.documentId || '')
 
 const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
-const tagsInput = ref('')
 const featuresJson = ref('[]')
 const specificationsJson = ref('{}')
 const scenariosJson = ref('[]')
@@ -96,7 +97,6 @@ const form = ref({
   isFeatured: false, tags: [], status: 'draft',
 })
 
-function parseTags(str) { return str ? String(str).split(',').map(t => t.trim()).filter(Boolean) : [] }
 function safeParse(str, fallback) { try { return JSON.parse(str) } catch { return fallback } }
 
 async function loadDetail() {
@@ -109,9 +109,8 @@ async function loadDetail() {
         description: item.description || '', content: item.content || '', coverImage: item.coverImage || '',
         priceRange: item.priceRange || '', priceUnit: item.priceUnit || '',
         features: item.features || [], specifications: item.specifications || {}, scenarios: item.scenarios || [],
-        isFeatured: item.isFeatured || false, tags: item.tags || [], status: item.status || 'draft',
+        isFeatured: item.isFeatured || false, tags: (item.tags || []).map(t => t.documentId), status: item.status || 'draft',
       }
-      tagsInput.value = (item.tags || []).join(',')
       featuresJson.value = JSON.stringify(item.features || [], null, 2)
       specificationsJson.value = JSON.stringify(item.specifications || {}, null, 2)
       scenariosJson.value = JSON.stringify(item.scenarios || [], null, 2)
@@ -123,7 +122,6 @@ async function handleSubmit(targetStatus) {
   if (!form.value.name) { uni.showToast({ title: '请填写名称', icon: 'none' }); return }
   const payload = {
     ...form.value,
-    tags: parseTags(tagsInput.value),
     features: safeParse(featuresJson.value, []),
     specifications: safeParse(specificationsJson.value, {}),
     scenarios: safeParse(scenariosJson.value, []),

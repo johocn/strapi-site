@@ -26,8 +26,8 @@
         </view>
 
         <view class="form-item">
-          <text class="form-label">标签（逗号分隔）</text>
-          <input type="text" v-model="tagsInput" placeholder="例: 资讯,公告" class="form-input" />
+          <text class="form-label">标签</text>
+          <TagSelector v-model="form.tags" :siteId="siteId" label="标签" />
         </view>
 
         <view class="form-item">
@@ -85,13 +85,14 @@ import { onLoad } from '@dcloudio/uni-app'
 import { articleApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import TagSelector from '../../../src/components/TagSelector.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
+const siteId = computed(() => userStore.currentSite?.documentId || '')
 
 const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
-const tagsInput = ref('')
 
 const form = ref({
   title: '',
@@ -109,11 +110,6 @@ const form = ref({
   status: 'draft',
 })
 
-function parseTags(str) {
-  if (!str) return []
-  return String(str).split(',').map(t => t.trim()).filter(Boolean)
-}
-
 async function loadDetail() {
   if (!documentId.value) return
   try {
@@ -126,7 +122,7 @@ async function loadDetail() {
         content: item.content || '',
         coverImage: item.coverImage || '',
         category: item.category || '',
-        tags: item.tags || [],
+        tags: (item.tags || []).map(t => t.documentId),
         seoTitle: item.seoTitle || '',
         seoDescription: item.seoDescription || '',
         seoKeywords: item.seoKeywords || '',
@@ -134,7 +130,6 @@ async function loadDetail() {
         allowIndex: item.allowIndex !== false,
         status: item.status || 'draft',
       }
-      tagsInput.value = (item.tags || []).join(',')
     }
   } catch (e) {
     uni.showToast({ title: '加载失败', icon: 'none' })
@@ -148,7 +143,6 @@ async function handleSubmit(targetStatus) {
   }
   const payload = {
     ...form.value,
-    tags: parseTags(tagsInput.value),
     status: targetStatus === 'published' ? 'published' : 'draft',
   }
   try {
