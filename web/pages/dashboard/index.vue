@@ -405,7 +405,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { useUserStore } from '../../src/store/user.js'
 import TenantSwitcher from '../../src/components/TenantSwitcher.vue'
 import { checkAuth } from '../../src/utils/auth.js'
@@ -497,7 +498,7 @@ async function loadStats() {
   }
 }
 
-onMounted(async () => {
+onShow(async () => {
   if (checkAuth()) {
     // 每次进入页面都刷新权限数据，确保获取最新的权限配置
     await userStore.fetchPermissions()
