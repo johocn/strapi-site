@@ -56,6 +56,38 @@
           <view class="stat-label">课程完成数</view>
         </view>
       </view>
+
+      <view class="stat-card" v-if="websiteEnabled" @click="navigateTo('/pages/website/article/list')">
+        <view class="stat-icon" style="background: #ede7f6;">📄</view>
+        <view class="stat-info">
+          <view class="stat-value">{{ stats.articles }}</view>
+          <view class="stat-label">资讯文章</view>
+        </view>
+      </view>
+
+      <view class="stat-card" v-if="websiteEnabled" @click="navigateTo('/pages/website/product/list')">
+        <view class="stat-icon" style="background: #e8eaf6;">📦</view>
+        <view class="stat-info">
+          <view class="stat-value">{{ stats.products }}</view>
+          <view class="stat-label">产品方案</view>
+        </view>
+      </view>
+
+      <view class="stat-card" v-if="websiteEnabled" @click="navigateTo('/pages/website/case/list')">
+        <view class="stat-icon" style="background: #e0f7fa;">🏆</view>
+        <view class="stat-info">
+          <view class="stat-value">{{ stats.cases }}</view>
+          <view class="stat-label">落地案例</view>
+        </view>
+      </view>
+
+      <view class="stat-card" v-if="websiteEnabled" @click="navigateTo('/pages/website/lead/list')">
+        <view class="stat-icon" style="background: #fce4ec;">📝</view>
+        <view class="stat-info">
+          <view class="stat-value">{{ stats.leads }}</view>
+          <view class="stat-label">线索管理</view>
+        </view>
+      </view>
     </view>
 
     <!-- 课程状态分布 -->
