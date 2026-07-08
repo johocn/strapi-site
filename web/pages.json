@@ -435,7 +435,22 @@
     { "path": "pages/website/compliance/list", "style": { "navigationBarTitleText": "合规公示" } },
     { "path": "pages/website/compliance/edit", "style": { "navigationBarTitleText": "合规编辑" } },
     { "path": "pages/website/download/list", "style": { "navigationBarTitleText": "下载管理" } },
-    { "path": "pages/website/download/edit", "style": { "navigationBarTitleText": "下载编辑" } }
+    { "path": "pages/website/download/edit", "style": { "navigationBarTitleText": "下载编辑" } },
+    { "path": "pages/website/article-category/list", "style": { "navigationBarTitleText": "文章分类" } },
+    { "path": "pages/website/article-category/edit", "style": { "navigationBarTitleText": "分类编辑" } },
+    { "path": "pages/website/brand-info/edit", "style": { "navigationBarTitleText": "品牌信息" } },
+    { "path": "pages/website/seo-config/edit", "style": { "navigationBarTitleText": "SEO 配置" } },
+    { "path": "pages/website/knowledge-entity/list", "style": { "navigationBarTitleText": "知识实体" } },
+    { "path": "pages/website/knowledge-entity/edit", "style": { "navigationBarTitleText": "实体编辑" } },
+    { "path": "pages/website/knowledge-relation/list", "style": { "navigationBarTitleText": "知识关系" } },
+    { "path": "pages/website/knowledge-relation/edit", "style": { "navigationBarTitleText": "关系编辑" } },
+    { "path": "pages/website/first-truth/list", "style": { "navigationBarTitleText": "第一真值" } },
+    { "path": "pages/website/first-truth/edit", "style": { "navigationBarTitleText": "真值编辑" } },
+    { "path": "pages/website/ai-summary/list", "style": { "navigationBarTitleText": "AI 摘要" } },
+    { "path": "pages/website/ai-summary/edit", "style": { "navigationBarTitleText": "摘要详情" } },
+    { "path": "pages/website/visit-log/list", "style": { "navigationBarTitleText": "访问日志" } },
+    { "path": "pages/website/interaction/list", "style": { "navigationBarTitleText": "互动记录" } },
+    { "path": "pages/website/search-log/list", "style": { "navigationBarTitleText": "搜索日志" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
