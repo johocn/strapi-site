@@ -87,3 +87,38 @@ export const faqApi = createContentApi('faqs')
 export const tutorialApi = createContentApi('tutorials')
 export const complianceApi = createContentApi('compliance')
 export const downloadApi = createContentApi('downloads')
+
+// ==================== 品牌信息（单例） ====================
+export const brandInfoApi = {
+  get: () => get(`${ADMIN_BASE}/brand-info`).then(res => extractList(res)).then(list => list[0] || null),
+  save: (data) => {
+    const existing = data.documentId
+    return existing
+      ? put(`${ADMIN_BASE}/brand-info/${existing}`, { data }).then(extractItem)
+      : post(`${ADMIN_BASE}/brand-info`, { data }).then(extractItem)
+  },
+}
+
+// ==================== 文章分类 ====================
+export const articleCategoryApi = createContentApi('article-categories')
+
+// ==================== AI 摘要 ====================
+export const aiSummaryApi = {
+  list: (params = {}) => get(`${ADMIN_BASE}/ai-summaries`, params).then(extractList),
+  detail: (documentId) => get(`${ADMIN_BASE}/ai-summaries/${documentId}`).then(extractItem),
+  create: (data) => post(`${ADMIN_BASE}/ai-summaries`, { data }).then(extractItem),
+  update: (documentId, data) => put(`${ADMIN_BASE}/ai-summaries/${documentId}`, { data }).then(extractItem),
+  delete: (documentId) => del(`${ADMIN_BASE}/ai-summaries/${documentId}`).then(extractItem),
+  regenerate: (documentId) => post(`${ADMIN_BASE}/ai-summaries/${documentId}/regenerate`).then(extractItem),
+}
+
+// ==================== 只读日志 ====================
+export const visitLogApi = {
+  list: (params = {}) => get(`${ADMIN_BASE}/visit-logs`, params).then(extractList),
+}
+export const interactionApi = {
+  list: (params = {}) => get(`${ADMIN_BASE}/interactions`, params).then(extractList),
+}
+export const searchLogApi = {
+  list: (params = {}) => get(`${ADMIN_BASE}/search-logs`, params).then(extractList),
+}
