@@ -60,6 +60,8 @@
             >
               <text class="tag-name">{{ tag.name }}</text>
               <text v-if="tag.tagGroup?.name" class="tag-group-label">{{ tag.tagGroup.name }}</text>
+              <text v-if="tag.isPublic" class="tag-badge public">公共</text>
+              <text v-else class="tag-badge site">站点</text>
               <text v-if="isTagSelected(tag)" class="tag-check">✓</text>
             </view>
             <view v-if="loadingTags" class="loading-text">
@@ -117,7 +119,7 @@
 
 <script setup>
 import { ref, watch, computed } from 'vue'
-import { getTagList, getTagGroupList, createTag, createTagGroup } from '../api/tag.js'
+import { getTagList, getTagGroupList, getTagGroupListBySite, createTag, createTagGroup } from '../api/tag.js'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -125,6 +127,7 @@ const props = defineProps({
   defaultGroupId: { type: String, default: null }, // 默认选中的分组
   defaultGroupName: { type: String, default: null }, // 默认分组名称（用于自动创建）
   mode: { type: String, default: 'all' }, // 'tag' | 'knowledge-point' | 'all'
+  siteId: { type: String, default: null },
 })
 
 const emit = defineEmits(['select', 'update:visible'])
@@ -236,7 +239,9 @@ watch(() => props.visible, async (val) => {
 
 async function loadGroups() {
   try {
-    const result = await getTagGroupList({ pageSize: 200 })
+    const result = props.siteId
+      ? await getTagGroupListBySite(props.siteId, { pageSize: 200 })
+      : await getTagGroupList({ pageSize: 200 })
     // 按 mode 过滤分组
     let groups = result.list || []
     if (props.mode === 'tag') {
@@ -276,6 +281,9 @@ async function loadTags(append = false) {
     const params = {
       page: tagPagination.value.page,
       pageSize: tagPagination.value.pageSize,
+    }
+    if (props.siteId) {
+      params.siteId = props.siteId
     }
     if (selectedGroupId.value) {
       params['filters[tagGroup][documentId][$eq]'] = selectedGroupId.value
@@ -681,4 +689,12 @@ function handleClose() {
   box-sizing: border-box;
   margin-bottom: 24rpx;
 }
+
+.tag-badge {
+  font-size: 18rpx;
+  padding: 1rpx 8rpx;
+  border-radius: 4rpx;
+}
+.tag-badge.public { background: #fff3e0; color: #faad14; }
+.tag-badge.site { background: #e8f5e9; color: #07c160; }
 </style>

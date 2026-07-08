@@ -10,6 +10,18 @@ export function getTagList(params = {}) {
   return get(`${ADMIN}/tags`, params).then(extractList)
 }
 
+export function getTagListBySite(siteId, params = {}) {
+  return get(`${ADMIN}/tags`, { ...params, siteId }).then(extractList)
+}
+
+export function getPublicTagListAdmin(params = {}) {
+  return get(`${ADMIN}/tags`, { ...params, isPublic: true }).then(extractList)
+}
+
+export function getTagGroupListBySite(siteId, params = {}) {
+  return get(`${ADMIN}/tag-groups`, { ...params, siteId }).then(extractList)
+}
+
 export function getTagDetail(documentId) {
   return get(`${ADMIN}/tags/${documentId}`).then(extractItem)
 }
