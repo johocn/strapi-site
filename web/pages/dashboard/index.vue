@@ -491,13 +491,17 @@ function getTotal(response) {
 
 async function loadStats() {
   try {
-    const [channels, courses, questions, points, userCourses, courseProgress] = await Promise.all([
+    const [channels, courses, questions, points, userCourses, courseProgress, articles, products, cases, leads] = await Promise.all([
       getAdminChannelList().catch(() => ({ pagination: { total: 0 }, list: [] })),
       getCourseList({ 'pagination[pageSize]': 100, 'fields': ['status'] }).catch(() => ({ pagination: { total: 0 }, list: [] })),
       getQuestionList().catch(() => ({ pagination: { total: 0 }, list: [] })),
       getRecordList().catch(() => ({ list: [], pagination: { total: 0 } })),
       getUserCourseList().catch(() => ({ pagination: { total: 0 }, list: [] })),
-      getCourseProgressList({ 'pagination[pageSize]': 5, 'pagination[sort]': 'updatedAt:desc' }).catch(() => ({ pagination: { total: 0 }, list: [] }))
+      getCourseProgressList({ 'pagination[pageSize]': 5, 'pagination[sort]': 'updatedAt:desc' }).catch(() => ({ pagination: { total: 0 }, list: [] })),
+      articleApi.list({ 'pagination[pageSize]': 1 }).catch(() => ({ pagination: { total: 0 } })),
+      productApi.list({ 'pagination[pageSize]': 1 }).catch(() => ({ pagination: { total: 0 } })),
+      caseApi.list({ 'pagination[pageSize]': 1 }).catch(() => ({ pagination: { total: 0 } })),
+      leadApi.list({ 'pagination[pageSize]': 1 }).catch(() => ({ pagination: { total: 0 } }))
     ])
 
     const courseList = courses.list || []
@@ -525,7 +529,11 @@ async function loadStats() {
       questions: getTotal(questions),
       points: getTotal(points),
       students: getTotal(userCourses),
-      completedCourses: completedCount
+      completedCourses: completedCount,
+      articles: getTotal(articles),
+      products: getTotal(products),
+      cases: getTotal(cases),
+      leads: getTotal(leads)
     }
   } catch (error) {
     uni.showToast({ title: '加载失败', icon: 'none' })
