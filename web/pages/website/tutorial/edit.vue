@@ -24,6 +24,12 @@
         </view>
         <view class="form-item"><text class="form-label">预计时长</text><input type="text" v-model="form.estimatedTime" placeholder="例: 30分钟" class="form-input" /></view>
         <view class="form-item"><text class="form-label">步骤（JSON 数组）*</text><textarea v-model="stepsJson" placeholder='[{"title":"步骤1","content":"..."}]' class="form-textarea content-textarea" /></view>
+        <JsonExampleBlock
+          fieldLabel="教程步骤"
+          fieldName="steps"
+          :exampleJson="tutorialStepsExample"
+          @fill="handleFillExample"
+        />
         <view class="form-item"><text class="form-label">材料（JSON 数组）</text><textarea v-model="materialsJson" placeholder='["材料1","材料2"]' class="form-textarea" /></view>
         <view class="form-item"><text class="form-label">结果说明</text><textarea v-model="form.result" placeholder="教程结果" class="form-textarea" /></view>
       </view>
@@ -46,6 +52,7 @@ import { tutorialApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
 import TagSelector from '../../../src/components/TagSelector.vue'
+import JsonExampleBlock from '../../../src/components/JsonExampleBlock.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
@@ -55,6 +62,46 @@ const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
 const stepsJson = ref('[]')
 const materialsJson = ref('[]')
+
+const tutorialStepsExample = JSON.stringify([
+  {
+    "title": "步骤一：登录系统",
+    "description": "使用管理员账号登录后台",
+    "image": "https://example.com/step1.png",
+    "tip": "默认账号 admin/admin"
+  },
+  {
+    "title": "步骤二：进入配置页",
+    "description": "点击左侧菜单「系统设置」",
+    "image": "https://example.com/step2.png"
+  },
+  {
+    "title": "步骤三：保存配置",
+    "description": "填写完成后点击「保存」按钮",
+    "tip": "保存后立即生效"
+  }
+], null, 2)
+
+function handleFillExample({ fieldName, exampleJson }) {
+  const refMap = { steps: stepsJson }
+  const target = refMap[fieldName]
+  if (!target) return
+  if (target.value && target.value.trim()) {
+    uni.showModal({
+      title: '确认覆盖',
+      content: `字段「${fieldName}」已有内容，确定用示例覆盖吗？`,
+      success: (res) => {
+        if (res.confirm) {
+          target.value = exampleJson
+          uni.showToast({ title: '已填入示例', icon: 'success' })
+        }
+      }
+    })
+  } else {
+    target.value = exampleJson
+    uni.showToast({ title: '已填入示例', icon: 'success' })
+  }
+}
 
 const difficultyOptions = [
   { label: '入门', value: 'beginner' },

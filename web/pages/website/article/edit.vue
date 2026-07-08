@@ -70,6 +70,17 @@
           <input type="text" v-model="form.canonicalUrl" placeholder="规范链接" class="form-input" />
         </view>
 
+        <view class="form-item">
+          <text class="form-label">结构化数据 (JSON)</text>
+          <textarea v-model="form.schemaJson" placeholder='{"@context":"https://schema.org"}' class="form-textarea json-textarea" />
+        </view>
+        <JsonExampleBlock
+          fieldLabel="结构化数据"
+          fieldName="schemaJson"
+          :exampleJson="articleSchemaJsonExample"
+          @fill="handleFillExample"
+        />
+
         <view class="form-item form-row">
           <text class="form-label">允许收录</text>
           <switch :checked="form.allowIndex" @change="form.allowIndex = !form.allowIndex" />
@@ -86,6 +97,7 @@ import { articleApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
 import TagSelector from '../../../src/components/TagSelector.vue'
+import JsonExampleBlock from '../../../src/components/JsonExampleBlock.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
@@ -106,9 +118,44 @@ const form = ref({
   seoDescription: '',
   seoKeywords: '',
   canonicalUrl: '',
+  schemaJson: '',
   allowIndex: true,
   status: 'draft',
 })
+
+const articleSchemaJsonExample = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "文章标题",
+  "image": ["https://example.com/photos/1x1/photo.jpg"],
+  "datePublished": "2026-01-01",
+  "dateModified": "2026-01-01",
+  "author": { "@type": "Person", "name": "作者名" },
+  "publisher": {
+    "@type": "Organization",
+    "name": "公司名",
+    "logo": { "@type": "ImageObject", "url": "https://example.com/logo.jpg" }
+  },
+  "description": "文章摘要"
+}, null, 2)
+
+function handleFillExample({ fieldName, exampleJson }) {
+  if (form.value[fieldName] && form.value[fieldName].trim()) {
+    uni.showModal({
+      title: '确认覆盖',
+      content: `字段「${fieldName}」已有内容，确定用示例覆盖吗？`,
+      success: (res) => {
+        if (res.confirm) {
+          form.value[fieldName] = exampleJson
+          uni.showToast({ title: '已填入示例', icon: 'success' })
+        }
+      }
+    })
+  } else {
+    form.value[fieldName] = exampleJson
+    uni.showToast({ title: '已填入示例', icon: 'success' })
+  }
+}
 
 async function loadDetail() {
   if (!documentId.value) return
@@ -127,6 +174,7 @@ async function loadDetail() {
         seoDescription: item.seoDescription || '',
         seoKeywords: item.seoKeywords || '',
         canonicalUrl: item.canonicalUrl || '',
+        schemaJson: typeof item.schemaJson === 'string' ? item.schemaJson : JSON.stringify(item.schemaJson || '', null, 2),
         allowIndex: item.allowIndex !== false,
         status: item.status || 'draft',
       }
@@ -258,6 +306,11 @@ page {
 
 .content-textarea {
   min-height: 400rpx;
+}
+
+.json-textarea {
+  min-height: 240rpx;
+  font-family: monospace;
 }
 
 .form-row {

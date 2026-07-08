@@ -17,6 +17,30 @@
         <view class="form-item"><text class="form-label">别名（逗号分隔）</text><input type="text" v-model="aliasesInput" placeholder="别名1,别名2" class="form-input" /></view>
         <view class="form-item"><text class="form-label">描述</text><textarea v-model="form.description" placeholder="实体描述" class="form-textarea" /></view>
       </view>
+
+      <view class="form-section">
+        <view class="section-title">实体属性</view>
+        <view class="form-item">
+          <text class="form-label">sameAs (JSON 数组)</text>
+          <textarea v-model="form.sameAs" placeholder='["https://..."]' class="form-textarea json-textarea" />
+        </view>
+        <JsonExampleBlock
+          fieldLabel="sameAs"
+          fieldName="sameAs"
+          :exampleJson="sameAsExample"
+          @fill="handleFillExample"
+        />
+        <view class="form-item">
+          <text class="form-label">属性 (JSON 对象)</text>
+          <textarea v-model="form.properties" placeholder='{"foundingDate":"..."}' class="form-textarea json-textarea" />
+        </view>
+        <JsonExampleBlock
+          fieldLabel="属性"
+          fieldName="properties"
+          :exampleJson="propertiesExample"
+          @fill="handleFillExample"
+        />
+      </view>
     </scroll-view>
   </view>
 </template>
@@ -27,6 +51,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { knowledgeGraphApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import JsonExampleBlock from '../../../src/components/JsonExampleBlock.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
@@ -35,14 +60,49 @@ const typeOptions = ['concept', 'person', 'organization', 'product', 'location',
 const documentId = ref('')
 const isEdit = computed(() => !!documentId.value)
 const aliasesInput = ref('')
-const form = ref({ name: '', type: '', aliases: [], description: '' })
+const form = ref({ name: '', type: '', aliases: [], description: '', sameAs: '', properties: '' })
+
+const sameAsExample = JSON.stringify([
+  "https://zh.wikipedia.org/wiki/你的公司",
+  "https://www.crunchbase.com/organization/your-company"
+], null, 2)
+
+const propertiesExample = JSON.stringify({
+  "foundingDate": "2015-01-01",
+  "foundingLocation": "北京",
+  "numberOfEmployees": "50-200",
+  "naics": "541511",
+  "isicV4": "6201"
+}, null, 2)
+
+function handleFillExample({ fieldName, exampleJson }) {
+  if (form.value[fieldName] && form.value[fieldName].trim()) {
+    uni.showModal({
+      title: '确认覆盖',
+      content: `字段「${fieldName}」已有内容，确定用示例覆盖吗？`,
+      success: (res) => {
+        if (res.confirm) {
+          form.value[fieldName] = exampleJson
+          uni.showToast({ title: '已填入示例', icon: 'success' })
+        }
+      }
+    })
+  } else {
+    form.value[fieldName] = exampleJson
+    uni.showToast({ title: '已填入示例', icon: 'success' })
+  }
+}
 
 async function loadDetail() {
   if (!documentId.value) return
   try {
     const item = await knowledgeGraphApi.listEntities({ 'filters[documentId]': documentId.value }).then(res => res.list?.[0]) || null
     if (item) {
-      form.value = { name: item.name || '', type: item.type || '', aliases: item.aliases || [], description: item.description || '' }
+      const toString = (v) => typeof v === 'string' ? v : JSON.stringify(v || '', null, 2)
+      form.value = {
+        name: item.name || '', type: item.type || '', aliases: item.aliases || [], description: item.description || '',
+        sameAs: toString(item.sameAs), properties: toString(item.properties),
+      }
       aliasesInput.value = Array.isArray(item.aliases) ? item.aliases.join(',') : (item.aliases || '')
     }
   } catch (e) { uni.showToast({ title: '加载失败', icon: 'none' }) }
@@ -74,4 +134,5 @@ page { background: #f5f5f5; }
 .form-input { width: 100%; height: 72rpx; padding: 0 20rpx; background: #f5f5f5; border-radius: 8rpx; font-size: 28rpx; box-sizing: border-box; }
 .picker-display { display: flex; align-items: center; line-height: 72rpx; }
 .form-textarea { width: 100%; min-height: 160rpx; padding: 20rpx; background: #f5f5f5; border-radius: 8rpx; font-size: 28rpx; box-sizing: border-box; }
+.json-textarea { min-height: 240rpx; font-family: monospace; }
 </style>

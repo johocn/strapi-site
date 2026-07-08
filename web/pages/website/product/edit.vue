@@ -48,10 +48,22 @@
           <text class="form-label">特性（JSON 数组）</text>
           <textarea v-model="featuresJson" placeholder='[{"name":"特性1","description":"..."}]' class="form-textarea" />
         </view>
+        <JsonExampleBlock
+          fieldLabel="产品特性"
+          fieldName="features"
+          :exampleJson="productFeaturesExample"
+          @fill="handleFillExample"
+        />
         <view class="form-item">
           <text class="form-label">规格（JSON 对象）</text>
           <textarea v-model="specificationsJson" placeholder='{"CPU":"4核","内存":"8G"}' class="form-textarea" />
         </view>
+        <JsonExampleBlock
+          fieldLabel="规格参数"
+          fieldName="specifications"
+          :exampleJson="productSpecExample"
+          @fill="handleFillExample"
+        />
         <view class="form-item">
           <text class="form-label">应用场景（JSON 数组）</text>
           <textarea v-model="scenariosJson" placeholder='["场景1","场景2"]' class="form-textarea" />
@@ -80,6 +92,7 @@ import { productApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
 import TagSelector from '../../../src/components/TagSelector.vue'
+import JsonExampleBlock from '../../../src/components/JsonExampleBlock.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
@@ -90,6 +103,40 @@ const isEdit = computed(() => !!documentId.value)
 const featuresJson = ref('[]')
 const specificationsJson = ref('{}')
 const scenariosJson = ref('[]')
+
+const productFeaturesExample = JSON.stringify([
+  { "icon": "⚡", "title": "高性能", "description": "毫秒级响应" },
+  { "icon": "🔒", "title": "安全可靠", "description": "金融级加密" },
+  { "icon": "📱", "title": "多端适配", "description": "PC/移动/小程序" }
+], null, 2)
+
+const productSpecExample = JSON.stringify([
+  { "label": "版本", "value": "企业版" },
+  { "label": "授权方式", "value": "年付订阅" },
+  { "label": "用户数", "value": "不限" },
+  { "label": "存储空间", "value": "100GB" }
+], null, 2)
+
+function handleFillExample({ fieldName, exampleJson }) {
+  const refMap = { features: featuresJson, specifications: specificationsJson }
+  const target = refMap[fieldName]
+  if (!target) return
+  if (target.value && target.value.trim()) {
+    uni.showModal({
+      title: '确认覆盖',
+      content: `字段「${fieldName}」已有内容，确定用示例覆盖吗？`,
+      success: (res) => {
+        if (res.confirm) {
+          target.value = exampleJson
+          uni.showToast({ title: '已填入示例', icon: 'success' })
+        }
+      }
+    })
+  } else {
+    target.value = exampleJson
+    uni.showToast({ title: '已填入示例', icon: 'success' })
+  }
+}
 
 const form = ref({
   name: '', slug: '', tagline: '', description: '', content: '', coverImage: '',

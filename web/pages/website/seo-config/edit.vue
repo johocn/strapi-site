@@ -24,6 +24,60 @@
         <view class="section-title">结构化数据</view>
         <view class="form-item"><text class="form-label">Structured Data (JSON)</text><textarea v-model="form.structuredData" placeholder='{"@context":"https://schema.org"}' class="form-textarea json-textarea" /></view>
       </view>
+
+      <view class="form-section">
+        <view class="section-title">SEO 高级配置</view>
+        <view class="form-item">
+          <text class="form-label">备选语言 (JSON 数组)</text>
+          <textarea v-model="form.alternateLocales" placeholder='["en-US","ja-JP"]' class="form-textarea json-textarea" />
+        </view>
+        <JsonExampleBlock
+          fieldLabel="备选语言"
+          fieldName="alternateLocales"
+          :exampleJson="alternateLocalesExample"
+          @fill="handleFillExample"
+        />
+        <view class="form-item">
+          <text class="form-label">Schema sameAs (JSON 数组)</text>
+          <textarea v-model="form.schemaSameAs" placeholder='["https://..."]' class="form-textarea json-textarea" />
+        </view>
+        <JsonExampleBlock
+          fieldLabel="Schema sameAs"
+          fieldName="schemaSameAs"
+          :exampleJson="schemaSameAsExample"
+          @fill="handleFillExample"
+        />
+        <view class="form-item">
+          <text class="form-label">Schema 联系点 (JSON 数组)</text>
+          <textarea v-model="form.schemaContactPoint" placeholder='[{"@type":"ContactPoint"}]' class="form-textarea json-textarea" />
+        </view>
+        <JsonExampleBlock
+          fieldLabel="Schema 联系点"
+          fieldName="schemaContactPoint"
+          :exampleJson="schemaContactPointExample"
+          @fill="handleFillExample"
+        />
+        <view class="form-item">
+          <text class="form-label">Sitemap 排除类型 (JSON 数组)</text>
+          <textarea v-model="form.sitemapExcludeTypes" placeholder='["visit-log"]' class="form-textarea json-textarea" />
+        </view>
+        <JsonExampleBlock
+          fieldLabel="Sitemap 排除类型"
+          fieldName="sitemapExcludeTypes"
+          :exampleJson="sitemapExcludeTypesExample"
+          @fill="handleFillExample"
+        />
+        <view class="form-item">
+          <text class="form-label">额外配置 (JSON 对象)</text>
+          <textarea v-model="form.extraConfig" placeholder='{"cacheTTL":3600}' class="form-textarea json-textarea" />
+        </view>
+        <JsonExampleBlock
+          fieldLabel="额外配置"
+          fieldName="extraConfig"
+          :exampleJson="extraConfigExample"
+          @fill="handleFillExample"
+        />
+      </view>
     </scroll-view>
   </view>
 </template>
@@ -34,6 +88,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { seoConfigApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import JsonExampleBlock from '../../../src/components/JsonExampleBlock.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
@@ -41,19 +96,73 @@ const hasPermission = userStore.hasPermission
 const form = ref({
   documentId: '', title: '', description: '', keywords: '', robots: 'index, follow',
   ogTitle: '', ogDescription: '', ogImage: '', structuredData: '',
+  alternateLocales: '', schemaSameAs: '', schemaContactPoint: '',
+  sitemapExcludeTypes: '', extraConfig: '',
 })
+
+const alternateLocalesExample = JSON.stringify(["en-US", "ja-JP", "ko-KR"], null, 2)
+
+const schemaSameAsExample = JSON.stringify([
+  "https://zh.wikipedia.org/wiki/你的公司",
+  "https://www.crunchbase.com/organization/your-company",
+  "https://www.linkedin.com/company/your-company",
+  "https://github.com/your-company"
+], null, 2)
+
+const schemaContactPointExample = JSON.stringify([
+  {
+    "@type": "ContactPoint",
+    "telephone": "+86-10-12345678",
+    "contactType": "customer service",
+    "areaServed": "CN",
+    "availableLanguage": ["Chinese", "English"],
+    "hoursAvailable": "Mo-Fr 09:00-18:00"
+  }
+], null, 2)
+
+const sitemapExcludeTypesExample = JSON.stringify(["visit-log", "search-log", "interaction"], null, 2)
+
+const extraConfigExample = JSON.stringify({
+  "cacheTTL": 3600,
+  "enableBrotli": true,
+  "cdnPurgeOnPublish": true
+}, null, 2)
+
+function handleFillExample({ fieldName, exampleJson }) {
+  if (form.value[fieldName] && form.value[fieldName].trim()) {
+    uni.showModal({
+      title: '确认覆盖',
+      content: `字段「${fieldName}」已有内容，确定用示例覆盖吗？`,
+      success: (res) => {
+        if (res.confirm) {
+          form.value[fieldName] = exampleJson
+          uni.showToast({ title: '已填入示例', icon: 'success' })
+        }
+      }
+    })
+  } else {
+    form.value[fieldName] = exampleJson
+    uni.showToast({ title: '已填入示例', icon: 'success' })
+  }
+}
 
 async function loadData() {
   try {
     const item = await seoConfigApi.get()
     if (item) {
+      const toString = (v) => typeof v === 'string' ? v : JSON.stringify(v || '', null, 2)
       form.value = {
         documentId: item.documentId || '',
         title: item.title || '', description: item.description || '',
         keywords: item.keywords || '', robots: item.robots || 'index, follow',
         ogTitle: item.ogTitle || '', ogDescription: item.ogDescription || '',
         ogImage: item.ogImage || '',
-        structuredData: typeof item.structuredData === 'string' ? item.structuredData : JSON.stringify(item.structuredData || '', null, 2),
+        structuredData: toString(item.structuredData),
+        alternateLocales: toString(item.alternateLocales),
+        schemaSameAs: toString(item.schemaSameAs),
+        schemaContactPoint: toString(item.schemaContactPoint),
+        sitemapExcludeTypes: toString(item.sitemapExcludeTypes),
+        extraConfig: toString(item.extraConfig),
       }
     }
   } catch (e) { uni.showToast({ title: '加载失败', icon: 'none' }) }

@@ -28,6 +28,12 @@
       <view class="form-section">
         <view class="section-title">社交链接</view>
         <view class="form-item"><text class="form-label">社交链接 (JSON)</text><textarea v-model="form.socialLinks" placeholder='{"wechat":"xxx","weibo":"xxx"}' class="form-textarea json-textarea" /></view>
+        <JsonExampleBlock
+          fieldLabel="社交链接"
+          fieldName="socialLinks"
+          :exampleJson="socialLinksExample"
+          @fill="handleFillExample"
+        />
       </view>
     </scroll-view>
   </view>
@@ -39,6 +45,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { brandInfoApi } from '../../../src/api/website.js'
 import { useUserStore } from '../../../src/store/user.js'
 import PageHeader from '../../../src/components/PageHeader.vue'
+import JsonExampleBlock from '../../../src/components/JsonExampleBlock.vue'
 
 const userStore = useUserStore()
 const hasPermission = userStore.hasPermission
@@ -48,6 +55,32 @@ const form = ref({
   contactEmail: '', contactPhone: '', contactAddress: '',
   icpRecord: '', businessLicense: '', socialLinks: '',
 })
+
+const socialLinksExample = JSON.stringify({
+  "wechat": { "qrcode": "https://example.com/wechat-qr.png", "accountId": "gh_xxxx" },
+  "weibo": { "url": "https://weibo.com/your-company", "label": "官方微博" },
+  "douyin": { "url": "https://douyin.com/user/your-company", "label": "抖音" },
+  "linkedin": { "url": "https://linkedin.com/company/your-company", "label": "LinkedIn" },
+  "github": { "url": "https://github.com/your-company", "label": "GitHub" }
+}, null, 2)
+
+function handleFillExample({ fieldName, exampleJson }) {
+  if (form.value[fieldName] && form.value[fieldName].trim()) {
+    uni.showModal({
+      title: '确认覆盖',
+      content: `字段「${fieldName}」已有内容，确定用示例覆盖吗？`,
+      success: (res) => {
+        if (res.confirm) {
+          form.value[fieldName] = exampleJson
+          uni.showToast({ title: '已填入示例', icon: 'success' })
+        }
+      }
+    })
+  } else {
+    form.value[fieldName] = exampleJson
+    uni.showToast({ title: '已填入示例', icon: 'success' })
+  }
+}
 
 async function loadData() {
   try {
