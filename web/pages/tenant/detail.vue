@@ -493,7 +493,8 @@ const featureLabels = {
   course: '课程管理',
   channel: '渠道管理',
   thirdParty: '三方登录',
-  oss: 'OSS存储'
+  oss: 'OSS存储',
+  website: '企业官网'
 }
 
 const platformIcons = {
@@ -610,7 +611,8 @@ const formData = reactive({
     course: true,
     channel: true,
     thirdParty: true,
-    oss: false
+    oss: false,
+    website: true
   },
   authConfig: {
     authMode: 'local',
