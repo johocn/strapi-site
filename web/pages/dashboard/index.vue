@@ -456,6 +456,7 @@ const courseStatusMap = ref({})
 const recentProgress = ref([])
 const pointsEnabled = ref(true)
 const websiteEnabled = ref(true)
+const logisticsEnabled = ref(true)
 
 const courseStatusData = computed(() => {
   const statusConfig = [
@@ -553,6 +554,7 @@ onShow(async () => {
       if (config) {
         pointsEnabled.value = config.featureFlags?.points !== false
         websiteEnabled.value = config.featureFlags?.website !== false
+        logisticsEnabled.value = config.featureFlags?.logistics !== false
       }
     } catch {}
     loadStats()

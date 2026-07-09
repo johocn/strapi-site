@@ -68,6 +68,7 @@ export function getDefaultConfig() {
       thirdParty: true,
       oss: false,
       website: true,
+      logistics: true,
       // 细粒度默认值
       pointsEnabled: true,
       coursePreviewEnabled: true,
