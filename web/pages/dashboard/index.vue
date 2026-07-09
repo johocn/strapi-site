@@ -387,6 +387,53 @@
       </view>
     </view>
 
+    <!-- 物流中心 -->
+    <view class="module-section" v-if="logisticsEnabled && hasPermission('menu.logistics-center')">
+      <view class="section-title">🚢 物流中心</view>
+      <view class="module-grid">
+        <view class="module-item" v-if="hasPermission('menu.logistics-quote')" @click="navigateTo('/pages/logistics/quote-request/list')">
+          <view class="module-icon">📋</view>
+          <view class="module-name">询价管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-tracking')" @click="navigateTo('/pages/logistics/tracking-shipment/list')">
+          <view class="module-icon">📦</view>
+          <view class="module-name">货物追踪</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-contact')" @click="navigateTo('/pages/logistics/contact-matrix/list')">
+          <view class="module-icon">📞</view>
+          <view class="module-name">联系渠道</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-review')" @click="navigateTo('/pages/logistics/review/list')">
+          <view class="module-icon">⭐</view>
+          <view class="module-name">客户评价</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-subscription')" @click="navigateTo('/pages/logistics/subscription/list')">
+          <view class="module-icon">🔔</view>
+          <view class="module-name">通知订阅</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-landing')" @click="navigateTo('/pages/logistics/landing-page/list')">
+          <view class="module-icon">🎯</view>
+          <view class="module-name">落地页</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-funnel')" @click="navigateTo('/pages/logistics/conversion-funnel/list')">
+          <view class="module-icon">📊</view>
+          <view class="module-name">转化漏斗</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-order')" @click="navigateTo('/pages/logistics/intent-order/list')">
+          <view class="module-icon">📝</view>
+          <view class="module-name">意向订单</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-referral')" @click="navigateTo('/pages/logistics/referral/list')">
+          <view class="module-icon">🎁</view>
+          <view class="module-name">推荐奖励</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.logistics-customer')" @click="navigateTo('/pages/logistics/customer-profile/list')">
+          <view class="module-icon">👥</view>
+          <view class="module-name">客户档案</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 系统设置 -->
     <view class="module-section" v-if="hasPermission('menu.system-center')">
       <view class="section-title">⚙️ 系统设置</view>
