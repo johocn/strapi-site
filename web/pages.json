@@ -45,6 +45,10 @@
       }
     },
     {
+      "path": "pages/channel/permissions",
+      "style": { "navigationBarTitleText": "渠道权限" }
+    },
+    {
       "path": "pages/tenant/list",
       "style": {
         "navigationBarTitleText": "租户管理"

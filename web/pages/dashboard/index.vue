@@ -365,7 +365,7 @@
           <view class="module-icon">☁️</view>
           <view class="module-name">OSS管理</view>
         </view>
-        <view class="module-item" v-if="hasPermission('third.account')" @click="navigateTo('/pages/third/accounts')">
+        <view class="module-item" v-if="hasPermission('third-party-account.read')" @click="navigateTo('/pages/third/accounts')">
           <view class="module-icon">🌐</view>
           <view class="module-name">第三方用户</view>
         </view>
