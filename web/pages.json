@@ -509,7 +509,19 @@
     { "path": "pages/studio/ad-slot/edit", "style": { "navigationBarTitleText": "编辑广告位" } },
     { "path": "pages/studio/collect-workflow/index", "style": { "navigationBarTitleText": "采集工作流" } },
     { "path": "pages/studio/publish-center/index", "style": { "navigationBarTitleText": "发布中心" } },
-    { "path": "pages/studio/analytics/index", "style": { "navigationBarTitleText": "数据分析" } }
+    { "path": "pages/studio/analytics/index", "style": { "navigationBarTitleText": "数据分析" } },
+    { "path": "pages/sso/token/list", "style": { "navigationBarTitleText": "Token管理" } },
+    { "path": "pages/sso/auth-code/list", "style": { "navigationBarTitleText": "授权码管理" } },
+    { "path": "pages/sso/binding/list", "style": { "navigationBarTitleText": "三方绑定" } },
+    { "path": "pages/sso/oauth-config/list", "style": { "navigationBarTitleText": "OAuth配置" } },
+    { "path": "pages/sso/oauth-config/edit", "style": { "navigationBarTitleText": "编辑OAuth配置" } },
+    { "path": "pages/sso/user-role/list", "style": { "navigationBarTitleText": "用户角色" } },
+    { "path": "pages/sso/user-role/edit", "style": { "navigationBarTitleText": "编辑角色" } },
+    { "path": "pages/sso/invite-code/list", "style": { "navigationBarTitleText": "邀请码管理" } },
+    { "path": "pages/sso/invite-code/edit", "style": { "navigationBarTitleText": "编辑邀请码" } },
+    { "path": "pages/sso/invite-usage/list", "style": { "navigationBarTitleText": "邀请记录" } },
+    { "path": "pages/sso/referral/list", "style": { "navigationBarTitleText": "推荐关系" } },
+    { "path": "pages/sso/sms-code/list", "style": { "navigationBarTitleText": "短信验证码" } }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",

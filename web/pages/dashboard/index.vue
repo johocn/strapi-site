@@ -489,6 +489,65 @@
       </view>
     </view>
 
+    <!-- SSO 单点登录 -->
+    <view class="module-section" v-if="ssoEnabled && hasPermission('menu.sso')">
+      <view class="section-title">🔐 SSO 单点登录</view>
+      <view class="module-grid">
+        <view class="module-item" v-if="hasPermission('menu.sso')" @click="navigateTo('/pages/system/tools')">
+          <view class="module-icon">👤</view>
+          <view class="module-name">用户管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso')" @click="navigateTo('/pages/system/tools')">
+          <view class="module-icon">📱</view>
+          <view class="module-name">应用管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso')" @click="navigateTo('/pages/system/tools')">
+          <view class="module-icon">🏷️</view>
+          <view class="module-name">渠道管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso')" @click="navigateTo('/pages/system/tools')">
+          <view class="module-icon">📋</view>
+          <view class="module-name">登录日志</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-token')" @click="navigateTo('/pages/sso/token/list')">
+          <view class="module-icon">🔑</view>
+          <view class="module-name">Token管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-token')" @click="navigateTo('/pages/sso/auth-code/list')">
+          <view class="module-icon">🎫</view>
+          <view class="module-name">授权码</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-binding')" @click="navigateTo('/pages/sso/binding/list')">
+          <view class="module-icon">🔗</view>
+          <view class="module-name">三方绑定</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-binding')" @click="navigateTo('/pages/sso/oauth-config/list')">
+          <view class="module-icon">⚙️</view>
+          <view class="module-name">OAuth配置</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-user-role')" @click="navigateTo('/pages/sso/user-role/list')">
+          <view class="module-icon">👥</view>
+          <view class="module-name">用户角色</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-invite')" @click="navigateTo('/pages/sso/invite-code/list')">
+          <view class="module-icon">🎁</view>
+          <view class="module-name">邀请码</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-invite')" @click="navigateTo('/pages/sso/invite-usage/list')">
+          <view class="module-icon">📝</view>
+          <view class="module-name">邀请记录</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-invite')" @click="navigateTo('/pages/sso/referral/list')">
+          <view class="module-icon">🤝</view>
+          <view class="module-name">推荐关系</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.sso-sms')" @click="navigateTo('/pages/sso/sms-code/list')">
+          <view class="module-icon">💬</view>
+          <view class="module-name">短信验证码</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 系统设置 -->
     <view class="module-section" v-if="hasPermission('menu.system-center')">
       <view class="section-title">⚙️ 系统设置</view>
@@ -658,6 +717,7 @@ onShow(async () => {
         websiteEnabled.value = config.featureFlags?.website !== false
         logisticsEnabled.value = config.featureFlags?.logistics !== false
         studioEnabled.value = config.featureFlags?.studio !== false
+        ssoEnabled.value = config.featureFlags?.sso !== false
       }
     } catch {}
     loadStats()

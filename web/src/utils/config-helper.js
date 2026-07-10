@@ -60,7 +60,7 @@ export function getDefaultConfig() {
     },
     featureFlags: {
       // 粗粒度模块总开关
-      sso: false,
+      sso: true,
       points: true,
       quiz: true,
       course: true,
