@@ -69,6 +69,7 @@ export function getDefaultConfig() {
       oss: false,
       website: true,
       logistics: true,
+      studio: true,
       // 细粒度默认值
       pointsEnabled: true,
       coursePreviewEnabled: true,

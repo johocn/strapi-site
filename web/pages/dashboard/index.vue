@@ -434,6 +434,61 @@
       </view>
     </view>
 
+    <!-- 媒体发布中心 -->
+    <view class="module-section" v-if="studioEnabled && hasPermission('menu.studio-center')">
+      <view class="section-title">🎬 媒体发布中心</view>
+      <view class="module-grid">
+        <view class="module-item" v-if="hasPermission('menu.studio')" @click="navigateTo('/pages/studio/article-draft/list')">
+          <view class="module-icon">📝</view>
+          <view class="module-name">草稿文章</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-collect')" @click="navigateTo('/pages/studio/collect-workflow/index')">
+          <view class="module-icon">🔍</view>
+          <view class="module-name">内容采集</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-collect')" @click="navigateTo('/pages/studio/collect-source/list')">
+          <view class="module-icon">📡</view>
+          <view class="module-name">采集源管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-collect')" @click="navigateTo('/pages/studio/collect-task/list')">
+          <view class="module-icon">📋</view>
+          <view class="module-name">采集任务</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-publish')" @click="navigateTo('/pages/studio/publish-center/index')">
+          <view class="module-icon">📤</view>
+          <view class="module-name">多平台发布</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-publish')" @click="navigateTo('/pages/studio/publish-platform/list')">
+          <view class="module-icon">🌐</view>
+          <view class="module-name">平台管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-publish')" @click="navigateTo('/pages/studio/publish-account/list')">
+          <view class="module-icon">👤</view>
+          <view class="module-name">账号管理</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-publish')" @click="navigateTo('/pages/studio/publish-record/list')">
+          <view class="module-icon">📑</view>
+          <view class="module-name">发布记录</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-stats')" @click="navigateTo('/pages/studio/analytics/index')">
+          <view class="module-icon">📊</view>
+          <view class="module-name">数据分析</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-stats')" @click="navigateTo('/pages/studio/stat-summary/list')">
+          <view class="module-icon">📈</view>
+          <view class="module-name">统计汇总</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-stats')" @click="navigateTo('/pages/studio/browser-log/list')">
+          <view class="module-icon">👁️</view>
+          <view class="module-name">浏览日志</view>
+        </view>
+        <view class="module-item" v-if="hasPermission('menu.studio-ad')" @click="navigateTo('/pages/studio/ad-slot/list')">
+          <view class="module-icon">📢</view>
+          <view class="module-name">广告位</view>
+        </view>
+      </view>
+    </view>
+
     <!-- 系统设置 -->
     <view class="module-section" v-if="hasPermission('menu.system-center')">
       <view class="section-title">⚙️ 系统设置</view>
@@ -602,6 +657,7 @@ onShow(async () => {
         pointsEnabled.value = config.featureFlags?.points !== false
         websiteEnabled.value = config.featureFlags?.website !== false
         logisticsEnabled.value = config.featureFlags?.logistics !== false
+        studioEnabled.value = config.featureFlags?.studio !== false
       }
     } catch {}
     loadStats()
