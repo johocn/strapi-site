@@ -128,7 +128,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getOssConfig, updateOssConfig, getSsoApps, createSsoApp, updateSsoApp, deleteSsoApp } from '../../src/api/config.js'
+import { getOssConfig, updateOssConfig } from '../../src/api/config.js'
+import { getSsoAppList, createSsoApp, updateSsoApp, deleteSsoApp } from '../../src/api/sso.js'
 import PageHeader from '../../src/components/PageHeader.vue'
 
 // ==================== OSS 配置 ====================
@@ -239,7 +240,7 @@ function onSsoSwitch(item, e) {
 
 async function loadSsoList() {
   try {
-    const res = await getSsoApps()
+    const res = await getSsoAppList()
     ssoList.value = (res || []).map((item, index) => ({
       ...item,
       _saving: false,
