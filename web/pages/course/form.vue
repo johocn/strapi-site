@@ -223,7 +223,7 @@
         <view class="form-item">
           <text class="form-label">渠道范围</text>
           <view class="radio-group">
-            <label class="radio-item" @click="setChannelScope('all')">
+            <label class="radio-item" v-if="allowCrossChannelPublish" @click="setChannelScope('all')">
               <view class="radio-circle" :class="{ active: form.channelScope === 'all' }"></view>
               <text>全部渠道（跨渠道公开）</text>
             </label>
@@ -249,7 +249,7 @@
           <text class="form-hint">学习本课程获得的积分将归属此渠道</text>
         </view>
 
-        <view class="form-item" v-if="showCrossChannelSection">
+        <view class="form-item" v-if="showCrossChannelSection && allowCrossChannelPublish">
           <text class="form-label">允许跨渠道访问</text>
           <view class="switch-row">
             <switch :checked="form.allowCrossChannel" @change="form.allowCrossChannel = !form.allowCrossChannel" />
@@ -446,7 +446,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
-import { getCourseDetail, createCourse, updateCourse, getCourseCategoryList, getKnowledgePointList } from '../../src/api/course.js'
+import { getCourseDetail, createCourse, updateCourse, getCourseCategoryList } from '../../src/api/course.js'
 import { getChannelList } from '../../src/api/channel.js'
 import { loadSiteConfig, isFeatureEnabled, clearConfigCache } from '../../src/utils/config-helper.js'
 import { useUserStore } from '../../src/store/user.js'
@@ -473,6 +473,10 @@ watch(() => userStore.currentTenantId, async () => {
   await loadSiteConfig()
   showPointsSection.value = isFeatureEnabled('pointsEnabled')
   showCrossChannelSection.value = isFeatureEnabled('allowCrossChannel')
+  allowCrossChannelPublish.value = isFeatureEnabled('allowCrossChannelPublish')
+  if (!allowCrossChannelPublish.value) {
+    form.channelScope = 'specific'
+  }
 })
 
 const form = reactive({
@@ -521,7 +525,6 @@ const selectedCategoryName = computed(() => {
 const tagList = ref([])
 const selectedTags = ref([])
 
-const knowledgePointList = ref([])
 const selectedKnowledgePoints = ref([])
 const showKnowledgePointPicker = ref(false)
 
@@ -584,15 +587,6 @@ async function loadChannels() {
     channelList.value = list || []
   } catch (e) {
     uni.showToast({ title: '加载渠道失败', icon: 'none' })
-  }
-}
-
-async function loadKnowledgePoints() {
-  try {
-    const { list } = await getKnowledgePointList({ pageSize: 200 })
-    knowledgePointList.value = list || []
-  } catch (e) {
-    uni.showToast({ title: '加载知识点失败', icon: 'none' })
   }
 }
 
@@ -901,7 +895,6 @@ onMounted(async () => {
 
   await loadCategories()
   await loadChannels()
-  await loadKnowledgePoints()
   await loadCourseDetail()
 })
 </script>
