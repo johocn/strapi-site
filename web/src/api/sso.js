@@ -60,3 +60,79 @@ export function updateSsoChannel(id, data) {
 export function getSsoLoginLogs(params = {}) {
   return get(`${ADMIN}/login-logs`, params).then(extractList)
 }
+
+// ==================== SSO Token 管理 ====================
+
+export const ssoTokenApi = {
+  list: (params = {}) => get(`${ADMIN}/tokens`, params).then(extractList),
+  detail: (id) => get(`${ADMIN}/tokens/${id}`).then(extractItem),
+  delete: (id) => del(`${ADMIN}/tokens/${id}`).then(extractItem),
+}
+
+// ==================== SSO 授权码管理 ====================
+
+export const ssoAuthCodeApi = {
+  list: (params = {}) => get(`${ADMIN}/auth-codes`, params).then(extractList),
+  detail: (id) => get(`${ADMIN}/auth-codes/${id}`).then(extractItem),
+  delete: (id) => del(`${ADMIN}/auth-codes/${id}`).then(extractItem),
+}
+
+// ==================== SSO 三方绑定 ====================
+
+export const ssoBindingApi = {
+  list: (params = {}) => get(`${ADMIN}/bindings`, params).then(extractList),
+  detail: (id) => get(`${ADMIN}/bindings/${id}`).then(extractItem),
+  create: (data) => post(`${ADMIN}/bindings`, { data }).then(extractItem),
+  update: (id, data) => put(`${ADMIN}/bindings/${id}`, { data }).then(extractItem),
+  delete: (id) => del(`${ADMIN}/bindings/${id}`).then(extractItem),
+}
+
+// ==================== SSO OAuth 配置 ====================
+
+export const ssoOauthConfigApi = {
+  list: (params = {}) => get(`${ADMIN}/oauth-configs`, params).then(extractList),
+  detail: (id) => get(`${ADMIN}/oauth-configs/${id}`).then(extractItem),
+  create: (data) => post(`${ADMIN}/oauth-configs`, { data }).then(extractItem),
+  update: (id, data) => put(`${ADMIN}/oauth-configs/${id}`, { data }).then(extractItem),
+  delete: (id) => del(`${ADMIN}/oauth-configs/${id}`).then(extractItem),
+}
+
+// ==================== SSO 用户应用角色 ====================
+
+export const ssoUserRoleApi = {
+  list: (params = {}) => get(`${ADMIN}/user-app-roles`, params).then(extractList),
+  detail: (id) => get(`${ADMIN}/user-app-roles/${id}`).then(extractItem),
+  create: (data) => post(`${ADMIN}/user-app-roles`, { data }).then(extractItem),
+  update: (id, data) => put(`${ADMIN}/user-app-roles/${id}`, { data }).then(extractItem),
+  delete: (id) => del(`${ADMIN}/user-app-roles/${id}`).then(extractItem),
+}
+
+// ==================== SSO 邀请码 ====================
+
+export const ssoInviteCodeApi = {
+  list: (params = {}) => get(`${ADMIN}/invite-codes`, params).then(extractList),
+  create: (data) => post(`${ADMIN}/invite-codes`, { data }).then(extractItem),
+  delete: (id) => del(`${ADMIN}/invite-codes/${id}`).then(extractItem),
+  validate: (id) => post(`${ADMIN}/invite-codes/${id}/validate`).then(extractItem),
+}
+
+// ==================== SSO 邀请记录 ====================
+
+export const ssoInviteUsageApi = {
+  list: (params = {}) => get(`${ADMIN}/invite-usages`, params).then(extractList),
+  delete: (id) => del(`${ADMIN}/invite-usages/${id}`).then(extractItem),
+}
+
+// ==================== SSO 推荐关系 ====================
+
+export const ssoReferralApi = {
+  list: (params = {}) => get(`${ADMIN}/referral-relations`, params).then(extractList),
+  delete: (id) => del(`${ADMIN}/referral-relations/${id}`).then(extractItem),
+}
+
+// ==================== SSO 短信验证码 ====================
+
+export const ssoSmsCodeApi = {
+  list: (params = {}) => get(`${ADMIN}/sms-codes`, params).then(extractList),
+  delete: (id) => del(`${ADMIN}/sms-codes/${id}`).then(extractItem),
+}
