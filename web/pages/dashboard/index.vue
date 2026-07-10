@@ -618,6 +618,8 @@ const recentProgress = ref([])
 const pointsEnabled = ref(true)
 const websiteEnabled = ref(true)
 const logisticsEnabled = ref(true)
+const studioEnabled = ref(true)
+const ssoEnabled = ref(true)
 
 const courseStatusData = computed(() => {
   const statusConfig = [
