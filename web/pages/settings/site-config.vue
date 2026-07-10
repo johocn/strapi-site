@@ -207,6 +207,13 @@
           <text class="form-label">跨渠道访问</text>
           <switch :checked="form.allowCrossChannel" @change="form.allowCrossChannel = $event.detail.value" :disabled="!isFieldEditable('allowCrossChannel') || form.channelUsage === 'site_only'" color="#07c160" />
         </view>
+        <view class="form-item switch-item" v-if="isFieldVisible('allowCrossChannelPublish')">
+          <view>
+            <text class="form-label">允许发布跨渠道课程</text>
+            <text class="form-hint">关闭后，课程发布时只能选择指定渠道，无法标记为全部渠道</text>
+          </view>
+          <switch :checked="form.allowCrossChannelPublish" @change="form.allowCrossChannelPublish = $event.detail.value" :disabled="!isFieldEditable('allowCrossChannelPublish') || form.channelUsage === 'site_only'" color="#07c160" />
+        </view>
         <view class="form-item switch-item" v-if="isFieldVisible('channelInviteEnabled')">
           <text class="form-label">渠道邀请</text>
           <switch :checked="form.channelInviteEnabled" @change="form.channelInviteEnabled = $event.detail.value" :disabled="!isFieldEditable('channelInviteEnabled')" color="#07c160" />
@@ -501,6 +508,7 @@ const form = ref({
   registerEnabled: true,
   inviteCodeRequired: false,
   allowCrossChannel: false,
+  allowCrossChannelPublish: false,
   channelUsage: 'site_cross_user',
   channelInviteEnabled: true,
   defaultChannelScope: 'all',
