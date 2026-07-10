@@ -77,6 +77,7 @@ export function getDefaultConfig() {
       courseEnrollEnabled: true,
       channelInviteEnabled: true,
       allowCrossChannel: false,
+      allowCrossChannelPublish: false,
       redemptionEnabled: true,
       courseCommentEnabled: false,
       courseRatingEnabled: false,
@@ -119,6 +120,7 @@ const FEATURE_TO_MODULE = {
   courseCommentEnabled: 'course',
   courseRatingEnabled: 'course',
   paymentEnabled: 'points',
+  allowCrossChannelPublish: 'channel',
 }
 
 export function isFeatureEnabled(key) {
