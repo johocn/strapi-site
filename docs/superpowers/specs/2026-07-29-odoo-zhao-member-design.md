@@ -217,10 +217,22 @@ cron（每月1日 02:00）→ zhao.member._check_period_downgrade()
                   └─ 写 grade.log(auto_downgrade, reason="周期考核未达标")
 ```
 
-**Cron 配置**
-- 模型：`ir.cron`，name="会员等级周期考核"
-- interval：每月 1 日 02:00
-- 调用：`zhao.member._check_period_downgrade()`
+**Cron 配置**（经源码验证，Odoo 19 `ir.cron` 无 `day_of_month` 字段，需用 `interval_type=months` + `nextcall`）
+
+```xml
+<record id="cron_zhao_member_period_downgrade" model="ir.cron">
+    <field name="name">会员等级周期考核</field>
+    <field name="model_id" ref="model_zhao_member"/>
+    <field name="state">code</field>
+    <field name="code">model._check_period_downgrade()</field>
+    <field name="interval_number">1</field>
+    <field name="interval_type">months</field>
+    <field name="nextcall" eval="(DateTime.now() + relativedelta(day=1, months=1)).strftime('%Y-%m-%d 02:00:00')"/>
+    <field name="active" eval="True"/>
+</record>
+```
+
+参考实现：`addons/gamification/data/ir_cron_data.xml`（gamification 模块的月度 cron 用同样模式）
 
 **关键方法**
 - `zhao.member._check_auto_upgrade()`：订单完成 hook 调用，连升多级
@@ -260,8 +272,14 @@ cron（每月1日 02:00）→ zhao.member._check_period_downgrade()
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `zhao_member_id` | Many2one → zhao.member | 下单会员（可空=非会员订单） |
-| `zhao_member_level_id` | Many2one → zhao.member.level | 下单时会员等级（快照） |
+| `zhao_member_level_id` | Many2one → zhao.member.level | 下单时会员等级 ID（普通 Many2one，create 时一次性写入，不被会员后续等级变更影响——这是 Many2one 天然的"等级记录级别快照"，仅冻结指向哪个 level 记录，不冻结 level 记录自身的 discount_rate 属性） |
 | `zhao_member_discount_total` | Float (compute) | 本单会员折扣总金额（原价-实收） |
+
+**快照语义说明**（经源码验证）：
+- Many2one 字段只存目标记录的 ID，create 后 ID 永不自动改变 → 等级记录级别快照成立
+- 但通过 `order.zhao_member_level_id.discount_rate` 访问时读取的是 level 记录的当前值
+- 若需冻结折扣率属性，需另加普通存储字段 `zhao_member_level_discount_snapshot`（Float），create 时手动赋值
+- 本期不引入属性快照字段（YAGNI），等级记录级别快照已满足审计需求
 
 ### 5.4 `pos.order.line` 扩展
 
@@ -271,31 +289,49 @@ cron（每月1日 02:00）→ zhao.member._check_period_downgrade()
 | `zhao_original_price_unit` | Float | 原价（快照） |
 | `zhao_discounted_price_unit` | Float (compute) | 折后价 `= original * (1 - discount/100)` |
 
+**与原生 `discount` 字段的关系**（经源码验证，`pos.order.line` 第 1561 行有原生 `discount` 字段，第 1713 行 `_compute_amount_line_all` 方法用 `price_unit * (1 - discount/100)` 计算税前价）：
+- 不复用原生 `discount`：避免与收银员手动折扣冲突
+- 折扣率写入 `zhao_member_discount`，折后价写入 `price_unit`（覆盖原价）
+- `_compute_amount_line_all` 仍用 `price_unit * (1 - discount/100)` 计算（此时 `discount=0`，`price_unit` 已是折后价）
+- `zhao_original_price_unit` 存储原价用于审计
+
 ### 5.5 折扣计算逻辑
 
-**选会员时（pos.order.zhao_member_id 变更）**
+**后端 onchange（Form 视图编辑时生效）**
 ```
-for line in order.lines:
-    if order.zhao_member_id:
-        level = order.zhao_member_id.level_id
-        # 1. 优先查商品级折扣 zhao.member.level.discount
-        product_discount = search(product=line.product_id.product_tmpl_id, level=level)
-        if product_discount:
-            line.zhao_member_discount = product_discount.discount_rate
+@api.onchange('zhao_member_id')
+def _onchange_zhao_member_id(self):
+    for line in self.lines:
+        if self.zhao_member_id:
+            level = self.zhao_member_id.level_id
+            # 1. 优先查商品级折扣 zhao.member.level.discount
+            product_discount = search(product=line.product_id.product_tmpl_id, level=level)
+            if product_discount:
+                line.zhao_member_discount = product_discount.discount_rate
+            else:
+                # 2. 兜底用 level.discount_rate
+                line.zhao_member_discount = level.discount_rate
         else:
-            # 2. 兜底用 level.discount_rate
-            line.zhao_member_discount = level.discount_rate
-    else:
-        line.zhao_member_discount = 0
-    # 3. 重算 line 价格
-    line._compute_amount_line()
+            line.zhao_member_discount = 0
+        # 3. 写折后价到 price_unit（原生 _compute_amount_line_all 会基于 price_unit 重算）
+        line.price_unit = line.zhao_original_price_unit * (1 - line.zhao_member_discount / 100)
 ```
+
+**关键**：调用的是原生 `_compute_amount_line_all()`（注意方法名带 `_all`），非 spec 早期版本误写的 `_compute_amount_line()`。该方法通过 `@api.onchange('price_unit', 'tax_ids', 'qty', 'discount', 'product_id')` 触发（第 1707 行），我们修改 `price_unit` 后会自动重算 `price_subtotal/price_subtotal_incl`。
 
 ### 5.6 POS 前端集成
 
-- 新增 `zhao_pos_member.js` 扩展：下单界面加「会员」按钮，弹窗输入手机号或扫卡
-- 选中会员后：写入 `zhao_member_id`，触发 `onchange` 重算所有行价格
+**关键约束**（经源码验证）：POS 前端是 OWL 应用，自己管理状态，**不通过后端 `@api.onchange` 同步**。后端 onchange 仅在 Form 视图编辑时生效；POS 前端需额外 JS/OWL 端配合。
+
+**前端实现策略**
+- 新增 `static/src/js/zhao_pos_member.js` 扩展 POS OWL 组件：下单界面加「会员」按钮，弹窗输入手机号或扫卡
+- 选中会员后：JS 端自行计算折扣率，写 `zhao_member_id` + 每行 `zhao_member_discount` + 每行 `price_unit`（折后价），然后通过 RPC 落库
 - 前端显示：订单头部显示会员姓名+等级，每行显示折扣率
+- 后端 `_onchange_zhao_member_id` 仅作为后端 Form 视图和测试的兜底，POS 实际走 JS 端逻辑
+
+**数据加载**
+- `pos.order` 的 `zhao_member_id`/`zhao_member_level_id` 字段需通过 `_load_pos_data_fields`（第 1591 行）加入 POS 数据加载白名单
+- `zhao.member` 模型需通过 `pos.config._get_pos_session_channels` 或类似机制暴露给 POS 前端（或单独 RPC 查询）
 
 ### 5.7 关键方法
 
@@ -311,8 +347,20 @@ for line in order.lines:
 
 ### 5.9 权限
 
-- `zhao_pos_iam` record rule：`pos.order` 按 `warehouse_id` 隔离 → 会员订单自动按门店隔离
-- `zhao.member` 新增 record rule：按 `warehouse_id` 隔离（与 pos.order 一致）
+**record rule 放置位置**（经架构验证）：`zhao.member` 的 record rule 必须放在 `zhao_member` 模块自身的 `security/` 目录，**不要放进 `zhao_pos_iam`**。
+
+理由：
+- Odoo 规范：模型的安全规则由定义该模型的模块负责，保证"装了模型就有规则"
+- 若放 `zhao_pos_iam`，当 `zhao_member` 单独安装（不装 POS 集成）时，会员数据无 record rule 保护，隔离失效
+- `zhao_pos_iam` 的职责边界：只扩展 POS 相关模型（pos.config/pos.session/pos.order/pos.payment/stock.picking）的 record rule
+
+**zhao_member 自身的 record rule**（`security/member_security.xml`）
+- `zhao.member`：`[('warehouse_id', 'in', user.zhao_warehouse_ids.ids)]`（与 zhao_pos_iam 一致的隔离模式）
+- `zhao.member.card`：通过 `member_id.warehouse_id` 间接隔离
+- `zhao.member.grade.log`：通过 `member_id.warehouse_id` 间接隔离
+- 空 `zhao_warehouse_ids` 处理：与 zhao_pos_iam 一致（普通用户保存时强制配置，admin 通过 env.su bypass）
+
+**pos.order 的会员字段隔离**：复用 `zhao_pos_iam` 已有的 `pos.order` record rule（按 `warehouse_id` 隔离），无需重复定义
 
 **关键取舍**：不复用原生 `discount` 字段，用独立的 `zhao_member_discount` + `zhao_original_price_unit` 快照——避免与收银员手动折扣冲突，同时保留原价用于审计和统计。
 
@@ -469,3 +517,26 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 - 会员导入导出（Excel）
 - 会员消费数据分析看板
 - 会员价批量配置工具
+
+## 9. 卡点修正记录（深度核查 2026-07-29）
+
+本节记录 spec 编写后深度核查发现的 5 处与 Odoo 19 实际不符的假设，及对应的修正措施。
+
+| # | 原假设 | Odoo 19 实际 | 修正位置 |
+|---|---|---|---|
+| 1 | `pos.order.line._compute_amount_line()` 方法 | 实际方法名为 `_compute_amount_line_all()`（`pos_order.py:1713`），通过 `@api.onchange('price_unit','tax_ids','qty','discount','product_id')` 触发，非 compute 字段 | 第 5.4、5.5 节 |
+| 2 | `ir.cron` 用 `day_of_month` 字段配置每月 1 日 | Odoo 19 `ir.cron` 无 `day_of_month` 字段，需用 `interval_type=months` + `nextcall` 的 `relativedelta(day=1, months=1)` 实现 | 第 4.5 节 Cron 配置 |
+| 3 | Many2one + store=True 可做"等级属性快照" | Many2one 只存 ID（等级记录级别快照成立），但通过 relation 访问 `discount_rate` 读取当前值；related+store 会重算，不能做快照 | 第 5.3 节快照语义说明 |
+| 4 | `@api.onchange` 能联动 POS 前端 | POS 前端是 OWL 应用自管状态，不通过后端 onchange 同步；前端联动需额外 JS/OWL 端配合 | 第 5.6 节 POS 前端集成 |
+| 5 | `zhao.member` record rule 放 `zhao_pos_iam` | 违反依赖方向，应放 `zhao_member` 自身；否则单独安装时无隔离 | 第 5.9 节权限规则放置位置 |
+
+**已验证的源码事实**
+- `pos.order.line` 第 1561 行：`discount = fields.Float(string='Discount (%)', digits=0, default=0.0)`
+- `pos.order.line` 第 1713 行：`_compute_amount_line_all` 方法，计算公式 `price = price_unit * (1 - discount/100)`
+- `pos.order` 第 852 行：`action_pos_order_paid` 方法，第 878 行 `self.write({'state': 'paid'})`，不调用 super，可安全覆写
+- `pos.order` 第 347 行：`payment_ids = fields.One2many('pos.payment', 'pos_order_id', string='Payments')`
+- `pos.order.line` 第 1539 行：`product_id = fields.Many2one('product.product', ...)`
+- `product.product` 第 42 行：`product_tmpl_id = fields.Many2one('product.template', ...)`，通过 `_inherits` 委托继承
+- `ir.cron` 参考：`addons/gamification/data/ir_cron_data.xml` 月度 cron 模式
+- `res.partner` 第 326 行：`_check_name` SQL CHECK 约束（type='contact' 时 name 必填）
+- `Field` 基类 `odoo/orm/fields.py:278`：`store: bool = True`（所有字段默认 store）
