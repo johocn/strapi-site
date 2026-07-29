@@ -95,13 +95,38 @@ from . import pos_session
     'data': [
         'views/pos_session_views.xml',
     ],
+    'post_init_hook': '_post_init_hook_sync_shift_state',
     'installable': True,
     'application': False,
     'auto_install': False,
 }
 ```
 
-- [ ] **Step 4: 创建占位 pos_session.py（空 inherit，确保模块可安装）**
+- [ ] **Step 4: 创建模块 `__init__.py`（含 post_init_hook）**
+
+```python
+# e:\code\odoo\custom-addons\zhao_pos_shift\__init__.py
+from odoo import api, SUPERUSER_ID
+
+
+def _post_init_hook_sync_shift_state(env):
+    """模块安装后同步已有 pos.session 的 zhao_shift_state。
+    避免历史 session 被锁死（state='opened' 但 zhao_shift_state='draft'）。
+    """
+    sessions = env['pos.session'].search([])
+    state_map = {
+        'opening_control': 'draft',
+        'opened': 'opened',
+        'closing_control': 'handover',
+        'closed': 'closed',
+    }
+    for session in sessions:
+        target = state_map.get(session.state, 'draft')
+        if session.zhao_shift_state != target:
+            session.sudo().write({'zhao_shift_state': target})
+```
+
+- [ ] **Step 5: 创建占位 pos_session.py（空 inherit，确保模块可安装）**
 
 ```python
 # e:\code\odoo\custom-addons\zhao_pos_shift\models\pos_session.py
@@ -112,7 +137,7 @@ class PosSession(models.Model):
     _inherit = 'pos.session'
 ```
 
-- [ ] **Step 5: 创建占位 views/pos_session_views.xml（空 data）**
+- [ ] **Step 6: 创建占位 views/pos_session_views.xml（空 data）**
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -124,7 +149,7 @@ class PosSession(models.Model):
 </odoo>
 ```
 
-- [ ] **Step 6: 安装测试**
+- [ ] **Step 7: 安装测试**
 
 Run:
 ```
@@ -132,11 +157,11 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: 退出码 0，日志显示 "Modules loaded: zhao_pos_shift"
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git -C e:\code\odoo add custom-addons/zhao_pos_shift
-git -C e:\code\odoo commit -m "feat: add zhao_pos_shift module skeleton"
+git -C e:\code\odoo commit -m "feat: add zhao_pos_shift module skeleton with post_init_hook"
 ```
 
 ---
@@ -415,14 +440,13 @@ Expected: FAIL，`action_zhao_start_counting` 方法不存在
         return result
 
     def action_zhao_start_counting(self):
-        """进入盘点：校验无未支付订单，锁定状态"""
+        """进入盘点：校验状态+无未支付订单，锁定状态"""
         self.ensure_one()
-        unpaid_orders = self.order_ids.filtered(
-            lambda o: o.state in ['draft', 'cancel']
-        )
+        from odoo.exceptions import ValidationError
+        if self.zhao_shift_state != 'opened':
+            raise ValidationError("仅进行中的班次可进入盘点")
         unpaid_count = len(self.order_ids.filtered(lambda o: o.state == 'draft'))
         if unpaid_count:
-            from odoo.exceptions import ValidationError
             raise ValidationError(
                 f"还有 {unpaid_count} 笔未支付订单，请先完成或取消"
             )
@@ -432,9 +456,11 @@ Expected: FAIL，`action_zhao_start_counting` 方法不存在
             self.cash_register_balance_end_real = self.zhao_counted_cash
 
     def action_zhao_handover(self, user_id, note=''):
-        """交接：校验差额已处理，写接班人"""
+        """交接：校验状态+差额已处理，写接班人"""
         self.ensure_one()
         from odoo.exceptions import ValidationError
+        if self.zhao_shift_state != 'counting':
+            raise ValidationError("仅盘点中的班次可交接")
         if self.zhao_cash_diff != 0 and self.zhao_diff_handling == 'none':
             raise ValidationError(
                 f"差额 {self.zhao_cash_diff} 元未处理，请选择差额处理方式"
@@ -977,13 +1003,18 @@ class TestWarehouseIsolation(TransactionCase):
 
     def test_07_picking_cross_store_or(self):
         """跨门店调拨 OR 规则生效"""
+        # 用各 warehouse 自己的 picking_type，避免 precompute 冲突
+        picking_type_a = self.env['stock.picking.type'].search([
+            ('warehouse_id', '=', self.warehouse_a.id), ('code', '=', 'outgoing'),
+        ], limit=1)
+        picking_type_b = self.env['stock.picking.type'].search([
+            ('warehouse_id', '=', self.warehouse_b.id), ('code', '=', 'outgoing'),
+        ], limit=1)
         picking_a = self.env['stock.picking'].create({
-            'picking_type_id': self.env['stock.picking.type'].search([('code', '=', 'outgoing')], limit=1).id,
-            'warehouse_id': self.warehouse_a.id,
+            'picking_type_id': picking_type_a.id,
         })
         picking_b = self.env['stock.picking'].create({
-            'picking_type_id': self.env['stock.picking.type'].search([('code', '=', 'outgoing')], limit=1).id,
-            'warehouse_id': self.warehouse_b.id,
+            'picking_type_id': picking_type_b.id,
         })
         pickings_visible = self.env['stock.picking'].with_user(self.user_a).search([])
         self.assertIn(picking_a, pickings_visible)
