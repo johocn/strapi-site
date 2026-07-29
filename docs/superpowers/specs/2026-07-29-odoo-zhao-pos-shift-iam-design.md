@@ -89,7 +89,7 @@
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `zhao_cash_breakdown` | Json | 钱箱面额拆分，结构 `{"100": 5, "50": 10, "20": 0, "10": 0, "5": 0, "1": 0, "coin": 0.0}` |
-| `zhao_expected_cash` | Float (compute) | 期初现金 + 现金订单 - 退款，实时计算应缴现金 |
+| `zhao_expected_cash` | Float (compute) | 应缴现金，等于原生 `cash_register_balance_end`（理论期末现金）；直接引用原生字段，避免重复计算 |
 | `zhao_counted_cash` | Float | 收银员实点现金 |
 | `zhao_cash_diff` | Float (compute) | `zhao_counted_cash - zhao_expected_cash`，正=长款，负=短款 |
 | `zhao_diff_handling` | Selection | `none`/`report`（仅记录上报）/`supply`（收银员补交）/`approve`（店长审批核销） |
@@ -113,10 +113,27 @@
 - `pos.session_views.xml`：在表单加「钱箱盘点」「差额处理」「交接信息」「店长确认」分组，状态栏加 `counting`/`handover`
 - `pos.session_tree`：列表加 `zhao_cash_diff` 列（红绿着色）
 
-### 3.4 与原生 `action_pos_session_closing_validate` 的关系
+### 3.4 与原生 session 关闭流程的关系
 
-- 不重写原生方法，在 `zhao_shift_state != 'closed'` 时拦截关闭，提示先走盘点流程
-- 原生 `closing_balance` 保持不动，`zhao_counted_cash` 作为补充字段（与原生不冲突）
+**Odoo 19 实际状态机**（经源码验证）：
+- `pos.session.state` 仅有 4 个值：`opening_control` / `opened` / `closing_control` / `closed`
+- 关闭链路：`action_pos_session_closing_control`（opened → closing_control）→ `action_pos_session_validate` → `action_pos_session_close` → `_validate_session`（最终 write state='closed'）
+- **Odoo 19 中不存在 `action_pos_session_closing_validate` 方法**（spec 早期版本有误，已修正）
+
+**原生现金字段**（经源码验证，`pos.session` 上）：
+- `cash_register_balance_start`：期初现金（readonly）
+- `cash_register_balance_end`：理论期末现金（compute）
+- `cash_register_balance_end_real`：实际期末现金（readonly，收银员录入）
+- `cash_register_difference`：差额（compute）
+- **不存在 `closing_balance` 字段**
+
+**zhao_pos_shift 的拦截策略**：
+- 覆写 `action_pos_session_closing_control`：在 `zhao_shift_state != 'closed'` 时抛 `ValidationError("请先完成班次交接")`，阻止进入 `closing_control`
+- **不覆写 `_validate_session`**（避免触碰 Odoo 复杂的账务逻辑）
+- `zhao_counted_cash` 与原生 `cash_register_balance_end_real` 关系：
+  - `zhao_counted_cash` 作为补充字段记录钱箱面额拆分后的总额
+  - 提交盘点时 `action_zhao_start_counting` 将 `zhao_counted_cash` 同步写入 `cash_register_balance_end_real`，保持原生字段一致
+  - `zhao_cash_diff` 与原生 `cash_register_difference` 含义相同但来源不同（zhao 基于面额拆分 JSON 计算），两者并存，不互相覆写
 
 ### 3.5 权限
 
@@ -139,17 +156,24 @@
 |---|---|---|---|
 | `pos.config` | 「仅本门店 POS」 | group_pos_user, group_pos_manager | `[('warehouse_id', 'in', user.zhao_warehouse_ids)]` |
 | `pos.session` | 「仅本门店班次」 | group_pos_user, group_pos_manager | `[('config_id.warehouse_id', 'in', user.zhao_warehouse_ids)]` |
-| `pos.payment` | 「仅本门店支付」 | group_pos_user, group_pos_manager | `[('session_id.config_id.warehouse_id', 'in', user.zhao_warehouse_ids)]` |
-| `pos.order` | 「仅本门店订单」 | group_pos_user, group_pos_manager | `[('session_id.config_id.warehouse_id', 'in', user.zhao_warehouse_ids)]` |
+| `pos.payment` | 「仅本门店支付」 | group_pos_user, group_pos_manager | `[('session_id.config_id.warehouse_id', 'in', user.zhao_warehouse_ids)]`（`pos.payment.session_id` 是 `store=True, index=True` 的 related 字段，可直接查询） |
+| `pos.order` | 「仅本门店订单」 | group_pos_user, group_pos_manager | `[('session_id.config_id.warehouse_id', 'in', user.zhao_warehouse_ids)]`（`pos.order.config_id` 是 `store=True` 的 related 字段，也可用 `[('config_id.warehouse_id', 'in', user.zhao_warehouse_ids)]`） |
 | `stock.picking` | 「仅本门店调拨」 | group_pos_user, group_pos_manager | `['\|', ('warehouse_id', 'in', user.zhao_warehouse_ids), ('warehouse_dest_id', 'in', user.zhao_warehouse_ids)]` |
+
+**关于 `pos.config.warehouse_id` 非必填的处理**（经源码验证，Odoo 19 中该字段无 `required=True`）：
+- record rule `[('warehouse_id', 'in', user.zhao_warehouse_ids)]` 当 `warehouse_id` 为 false 时该 pos.config 不会被任何普通用户看到
+- **配置责任**：门店 POS 必须绑定 warehouse，否则无法被收银员看到
+- `zhao_pos_iam` 在 `pos.config` 表单上加 `required=True`（通过视图 attrs，不改原生模型字段），强制二开场景下必须选 warehouse
+- admin 用户（uid=SUPERUSER_ID）通过 `env.su=True` 机制 bypass record rule，能看到未绑定的 pos.config
 
 ### 4.3 全局规则避免冲突与空值行为
 
 - 区域经理（`zhao_role='area_manager'`）通过 `zhao_warehouse_ids` 多选实现跨门店可见，不需要单独规则
 - 财务（`zhao_role='finance'`）走原生 `account.group_account_invoice`，不受门店限制（需看全公司账单）
-- **`zhao_warehouse_ids` 为空时的行为（重要）**：
+- **`zhao_warehouse_ids` 为空时的行为（重要，经源码验证）**：
   - Odoo record rule 中 `[('warehouse_id', 'in', user.zhao_warehouse_ids)]` 当列表为空时匹配不到任何记录，即"全不可见"
-  - admin 用户（Administrator）通过 Odoo 原生 `is_admin` bypass 机制不受 record rule 限制，无需配置
+  - **只有 `uid == SUPERUSER_ID`（即 uid=1，admin 账户）才会通过 `env.su=True` 机制 bypass record rule**（源码位置：`odoo/orm/environments.py` 第 64-67 行 + `odoo/addons/base/models/ir_rule.py` 第 113-121 行）
+  - `has_group('base.group_system')` 单独 **不** bypass record rule（`_is_admin()` 包含 group_erp_manager，但 bypass 仅看 `env.su`）
   - 普通用户若未配置 `zhao_warehouse_ids` 将看不到任何 POS 数据——这是配置责任，不是代码兜底
   - 模块安装后需在 `data/res_users_demo.xml` 或文档中明确提示：**POS 用户必须绑定至少一个门店**
   - `zhao_pos_iam` 的 `res.users` 表单校验：保存时若 `zhao_role` in (`cashier`/`store_manager`/`area_manager`) 且 `zhao_warehouse_ids` 为空，弹出 `ValidationError("请为该用户绑定至少一个门店")`
@@ -233,7 +257,7 @@
 |---|---|
 | 盘点时仍有未支付订单 | `action_zhao_start_counting` 拦截：`ValidationError("还有 N 笔未支付订单，请先完成或取消")` |
 | 差额未处理就交接 | `action_zhao_handover` 拦截：当 `zhao_cash_diff != 0` 且 `zhao_diff_handling == 'none'` 时报「差额 X 元未处理」 |
-| 短款 `approve` 但未店长确认就关闭 | `action_pos_session_closing_validate` 前置拦截：`zhao_shift_state != 'closed'` 时报「请先完成交接」 |
+| 短款 `approve` 但未店长确认就关闭 | 覆写 `action_pos_session_closing_control` 拦截：`zhao_shift_state != 'closed'` 时报「请先完成班次交接」 |
 | 店长确认非 `handover` 状态 | `action_zhao_manager_confirm` 拦截：「仅可确认已交接班次」 |
 | 收银员尝试跨门店操作 | record rule 静默过滤，不报错（Odoo 原生行为） |
 | `zhao_warehouse_ids` 配置丢失 | 普通用户保存时 `ValidationError("请为该用户绑定至少一个门店")`，强制配置 |
@@ -271,7 +295,8 @@
 
 - 复用 Odoo 19 `TransactionCase` + `@tagged('post_install', '-at_install')`，与已有 `test_pos_flow.py` 风格一致
 - `setUpClass` 创建 2 个 warehouse、2 个 pos.config、2 个用户，覆盖隔离场景
-- `zhao_pos_iam` 测试需 `StockUsers` common class（Odoo 原生多用户测试基类）
+- **`zhao_pos_iam` 测试基类**：使用 `odoo.addons.stock.tests.common.TestStockCommon`（位于 `e:\code\odoo\addons\stock\tests\common.py`，提供 `user_stock_user` 和 `user_stock_manager` 多用户测试 fixture；注意 Odoo 19 中不存在 `StockUsers` 类，spec 早期版本有误已修正）
+- 多用户权限隔离测试需用 `self.env(user=self.user_xxx)` 切换用户上下文后查询
 
 ### 6.4 测试执行命令
 
@@ -309,3 +334,22 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 - 一天多班轮换（通过关闭再开 session 实现，不引入子班次表）
 - 配置化角色模型（`zhao.role`）
 - 交接记录独立模型（`zhao.session.handover`）
+
+## 9. 卡点验证记录（2026-07-29 源码核验）
+
+生成实施计划前对 Odoo 19 源码逐项核验，修正 6 处 spec 早期假设错误：
+
+| # | spec 早期假设 | Odoo 19 实际 | 修正措施 |
+|---|---|---|---|
+| 1 | `pos.config.warehouse_id` 必填 | 非必填（无 `required=True`，源码 `addons/point_of_sale/models/pos_config.py:180`） | 在 pos.config 表单视图加 `required=True` attrs；record rule 对未绑定 warehouse 的 pos.config 自动隐藏 |
+| 2 | 存在 `action_pos_session_closing_validate` 方法 | **不存在**；实际链路 `action_pos_session_closing_control` → `action_pos_session_validate` → `action_pos_session_close` → `_validate_session`（`addons/point_of_sale/models/pos_session.py:382,407,411,418`） | 改为覆写 `action_pos_session_closing_control`；不触碰 `_validate_session` |
+| 3 | `pos.session` 有 `closing_balance` 字段 | **不存在**；实际字段 `cash_register_balance_start` / `cash_register_balance_end` / `cash_register_balance_end_real` / `cash_register_difference`（`pos_session.py:61,64,58,69`） | `zhao_expected_cash` 直接引用 `cash_register_balance_end`；`zhao_counted_cash` 同步写入 `cash_register_balance_end_real` |
+| 4 | admin 通过 `has_group('base.group_system')` bypass record rule | **错误**；只有 `uid=SUPERUSER_ID`（env.su=True）才 bypass（`odoo/orm/environments.py:64-67` + `odoo/addons/base/models/ir_rule.py:113-121`） | 明确文档：仅 uid=1 才 bypass，`group_system` 单独不 bypass |
+| 5 | 存在 `StockUsers` 测试基类 | **不存在**；实际是 `TestStockCommon`（`addons/stock/tests/common.py:9`，提供 `user_stock_user`/`user_stock_manager`） | 改用 `TestStockCommon` 或自建多用户 fixture |
+| 6 | `pos.payment.session_id` 需通过 order 间接查询 | `related='pos_order_id.session_id'` 但 `store=True, index=True`（`addons/point_of_sale/models/pos_payment.py:28`），可直接查询 | record rule 直接用 `[('session_id.config_id.warehouse_id', 'in', ...)]`，无需经 order |
+
+**其他已验证事实**：
+- `pos.session.config_id` 存在且必填（`pos_session.py:32-35`）
+- `pos.order.session_id` 存在（`pos_order.py:319`），`pos.order.config_id` 是 store=True 的 related 字段
+- `group_pos_user` 和 `group_pos_manager` 均存在（`addons/point_of_sale/security/point_of_sale_security.xml:8,13`），Odoo 19 引入 `res.groups.privilege` 概念
+- `pos.session` 无 `payment_ids` 字段，必须通过 `order_ids.payment_ids` 间接访问（与 zhao_pos 模块注释一致）
