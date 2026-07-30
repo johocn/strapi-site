@@ -1,4 +1,4 @@
-# zhao_market_pos 挂单前后端统一状态机 Implementation Plan
+﻿# zhao_market_pos 挂单前后端统一状态机 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -33,7 +33,7 @@
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_service.py:155-206`
 
-- [ ] **Step 1: 重构 _create_order 为 _create_order_core**
+- [x] **Step 1: 重构 _create_order 为 _create_order_core**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_service.py` 第 167-206 行的 `_create_order` 方法替换为 `_create_order_core`（不含支付逻辑，新增 state 参数）：
 
@@ -75,7 +75,7 @@
         return order
 ```
 
-- [ ] **Step 2: 重构 submit_order 支持 draft 转 paid**
+- [x] **Step 2: 重构 submit_order 支持 draft 转 paid**
 
 将第 155-165 行的 `submit_order` 方法替换为：
 
@@ -124,7 +124,7 @@
                 raise PosServiceError(f"订单提交失败: {e}") from e
 ```
 
-- [ ] **Step 3: 新增 create_draft_order 方法**
+- [x] **Step 3: 新增 create_draft_order 方法**
 
 在 `submit_order` 方法后（原 `_create_order` 的位置之后，`_apply_payment` 之前）插入：
 
@@ -142,7 +142,7 @@
             raise PosServiceError(f"创建 draft 订单失败: {e}") from e
 ```
 
-- [ ] **Step 4: 运行现有测试验证无回归**
+- [x] **Step 4: 运行现有测试验证无回归**
 
 Run:
 ```
@@ -150,7 +150,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`。现有 71 个测试应全部通过（submit_order 新建分支行为与原 _create_order 一致）。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd e:\code\odoo
@@ -165,7 +165,7 @@ git commit -m "refactor(zhao_market_pos): extract _create_order_core, add create
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_controller.py:152-153`
 
-- [ ] **Step 1: 在 order_submit 端点后插入 create_draft 端点**
+- [x] **Step 1: 在 order_submit 端点后插入 create_draft 端点**
 
 在 `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_controller.py` 第 152 行（`order_submit` 方法的 `return self._call(...)` 之后，`@http.route('/zhao_market_pos/v1/order/hold'` 之前）插入：
 
@@ -184,7 +184,7 @@ git commit -m "refactor(zhao_market_pos): extract _create_order_core, add create
         )
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd e:\code\odoo
@@ -199,7 +199,7 @@ git commit -m "feat(zhao_market_pos): add /v1/order/create_draft endpoint"
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_service.py`
 
-- [ ] **Step 1: 新增 test_create_draft_order_success**
+- [x] **Step 1: 新增 test_create_draft_order_success**
 
 在 `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_service.py` 的 `TestPosServiceSubmit` 类中，`test_submit_order_basic_cash` 方法后插入：
 
@@ -223,7 +223,7 @@ git commit -m "feat(zhao_market_pos): add /v1/order/create_draft endpoint"
         self.assertEqual(order.zhao_member_id, member)
 ```
 
-- [ ] **Step 2: 新增 test_submit_order_draft_to_paid**
+- [x] **Step 2: 新增 test_submit_order_draft_to_paid**
 
 紧接上一测试后插入：
 
@@ -247,7 +247,7 @@ git commit -m "feat(zhao_market_pos): add /v1/order/create_draft endpoint"
         self.assertEqual(order.payment_ids[0].payment_method, 'cash')
 ```
 
-- [ ] **Step 3: 新增 test_submit_order_draft_to_paid_lines_replaced**
+- [x] **Step 3: 新增 test_submit_order_draft_to_paid_lines_replaced**
 
 紧接上一测试后插入：
 
@@ -293,7 +293,7 @@ git commit -m "feat(zhao_market_pos): add /v1/order/create_draft endpoint"
         self.assertEqual(product_ids, {self.product.id, product2.id})
 ```
 
-- [ ] **Step 4: 新增 test_hold_and_resume_with_draft_order**
+- [x] **Step 4: 新增 test_hold_and_resume_with_draft_order**
 
 紧接上一测试后插入：
 
@@ -327,7 +327,7 @@ git commit -m "feat(zhao_market_pos): add /v1/order/create_draft endpoint"
         self.assertFalse(order.is_held)
 ```
 
-- [ ] **Step 5: 新增 test_submit_order_non_draft_fails**
+- [x] **Step 5: 新增 test_submit_order_non_draft_fails**
 
 紧接上一测试后插入：
 
@@ -349,7 +349,7 @@ git commit -m "feat(zhao_market_pos): add /v1/order/create_draft endpoint"
         self.assertIn("状态非 draft", str(ctx.exception))
 ```
 
-- [ ] **Step 6: 新增 test_submit_order_nonexistent_order_id_fails**
+- [x] **Step 6: 新增 test_submit_order_nonexistent_order_id_fails**
 
 紧接上一测试后插入：
 
@@ -365,7 +365,7 @@ git commit -m "feat(zhao_market_pos): add /v1/order/create_draft endpoint"
         self.assertIn("不存在", str(ctx.exception))
 ```
 
-- [ ] **Step 7: 导入 PosServiceError**
+- [x] **Step 7: 导入 PosServiceError**
 
 确认 `TestPosServiceSubmit.setUp` 中已导入 `PosServiceError`（第 303-305 行已有）：
 ```python
@@ -375,7 +375,7 @@ from odoo.addons.zhao_market_pos.controllers.pos_service import (
 ```
 若已存在则跳过此步。若 Step 5/6 用到 `PosServiceError` 但未导入，在 setUp 中补充导入。
 
-- [ ] **Step 8: 运行测试验证全部通过**
+- [x] **Step 8: 运行测试验证全部通过**
 
 Run:
 ```
@@ -383,7 +383,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`，测试数从 71 增加到 77（+6 个新测试）。
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 cd e:\code\odoo
@@ -399,7 +399,7 @@ git commit -m "test(zhao_market_pos): add 6 draft/hold/resume unit tests"
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_cashier_e2e.py:129-156`
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_controller.py`
 
-- [ ] **Step 1: 修改 test_e2e_hold_and_resume 走 draft 流程**
+- [x] **Step 1: 修改 test_e2e_hold_and_resume 走 draft 流程**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_cashier_e2e.py` 第 129-156 行的整个 `test_e2e_hold_and_resume` 方法替换为：
 
@@ -453,7 +453,7 @@ git commit -m "test(zhao_market_pos): add 6 draft/hold/resume unit tests"
         self.assertEqual(len(order.payment_ids), 1)
 ```
 
-- [ ] **Step 2: 新增 controller test_order_create_draft_missing_session**
+- [x] **Step 2: 新增 controller test_order_create_draft_missing_session**
 
 在 `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_controller.py` 的 `test_order_submit_missing_session` 方法后插入：
 
@@ -466,7 +466,7 @@ git commit -m "test(zhao_market_pos): add 6 draft/hold/resume unit tests"
         self.assertIn('session_id', data['error'])
 ```
 
-- [ ] **Step 3: 新增 controller test_order_create_draft_success**
+- [x] **Step 3: 新增 controller test_order_create_draft_success**
 
 紧接上一测试后插入：
 
@@ -493,7 +493,7 @@ git commit -m "test(zhao_market_pos): add 6 draft/hold/resume unit tests"
         self.assertTrue(data['data']['name'].startswith('ZMP'))
 ```
 
-- [ ] **Step 4: 在 controller test setUp 中创建 session**
+- [x] **Step 4: 在 controller test setUp 中创建 session**
 
 在 `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_controller.py` 的 `setUp` 方法末尾（`self._csrf_token = ''` 之前）插入：
 
@@ -508,7 +508,7 @@ git commit -m "test(zhao_market_pos): add 6 draft/hold/resume unit tests"
         self.session_id_for_draft = self.draft_session.id
 ```
 
-- [ ] **Step 5: 运行全部测试验证**
+- [x] **Step 5: 运行全部测试验证**
 
 Run:
 ```
@@ -516,7 +516,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`，全部测试通过。
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 cd e:\code\odoo
@@ -531,7 +531,7 @@ git commit -m "test(zhao_market_pos): E2E hold/resume via draft flow + controlle
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\api\client.ts:78-92`
 
-- [ ] **Step 1: 修改 orderSubmit payload 类型加 order_id**
+- [x] **Step 1: 修改 orderSubmit payload 类型加 order_id**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\api\client.ts` 第 78-83 行：
 
@@ -556,7 +556,7 @@ git commit -m "test(zhao_market_pos): E2E hold/resume via draft flow + controlle
   },
 ```
 
-- [ ] **Step 2: 新增 orderCreateDraft 函数**
+- [x] **Step 2: 新增 orderCreateDraft 函数**
 
 在第 83 行（`orderSubmit` 方法的 `},` 之后，`async orderHold` 之前）插入：
 
@@ -570,7 +570,7 @@ git commit -m "test(zhao_market_pos): E2E hold/resume via draft flow + controlle
   },
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd e:\code\odoo
@@ -585,7 +585,7 @@ git commit -m "feat(zhao_market_pos): add orderCreateDraft API, orderSubmit payl
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\stores\pending.ts:19-37`
 
-- [ ] **Step 1: 重写 hold() 方法**
+- [x] **Step 1: 重写 hold() 方法**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\stores\pending.ts` 第 19-37 行的 `hold` 方法替换为：
 
@@ -640,7 +640,7 @@ git commit -m "feat(zhao_market_pos): add orderCreateDraft API, orderSubmit payl
   }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd e:\code\odoo
@@ -655,7 +655,7 @@ git commit -m "refactor(zhao_market_pos): pending.hold() calls create_draft then
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\views\CashierView.vue:312-327`
 
-- [ ] **Step 1: 重写 confirmHold 方法**
+- [x] **Step 1: 重写 confirmHold 方法**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\views\CashierView.vue` 第 312-327 行的 `confirmHold` 方法替换为：
 
@@ -682,7 +682,7 @@ async function confirmHold() {
 }
 ```
 
-- [ ] **Step 2: 修改 doResume 方法**
+- [x] **Step 2: 修改 doResume 方法**
 
 查找 `doResume` 方法（应在 `confirmHold` 之后或挂单相关区域）。将其替换为：
 
@@ -704,7 +704,7 @@ async function doResume(holdKey: string) {
 
 **注意**：若现有 `doResume` 方法体与上述不同，保留原有的 dialog 关闭和 UI 状态逻辑，仅替换核心取单逻辑（从直接读 `pendingStore.orders.find` 改为调 `pendingStore.resume`）。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd e:\code\odoo
@@ -719,7 +719,7 @@ git commit -m "refactor(zhao_market_pos): confirmHold and doResume call backend 
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\views\CheckoutView.vue:161-182`
 
-- [ ] **Step 1: 在 payload 中加 order_id**
+- [x] **Step 1: 在 payload 中加 order_id**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\views\CheckoutView.vue` 第 161-182 行的 `const payload = {...}` 中：
 
@@ -776,7 +776,7 @@ git commit -m "refactor(zhao_market_pos): confirmHold and doResume call backend 
   }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd e:\code\odoo
@@ -792,7 +792,7 @@ git commit -m "feat(zhao_market_pos): submitOrder payload include order_id for d
 - Build output: `e:\code\odoo\custom-addons\zhao_market_pos\static\src\pos\pos.umd.js`
 - Build output: `e:\code\odoo\custom-addons\zhao_market_pos\static\src\pos\pos.css`
 
-- [ ] **Step 1: 前端构建**
+- [x] **Step 1: 前端构建**
 
 Run:
 ```
@@ -801,11 +801,11 @@ npm run build
 ```
 Expected: 构建成功，`pos.umd.js` 和 `pos.css` 生成时间戳更新。
 
-- [ ] **Step 2: 验证前端无类型错误**
+- [x] **Step 2: 验证前端无类型错误**
 
 检查构建输出无 TypeScript 错误。若报错，修复后重新构建。
 
-- [ ] **Step 3: 运行后端全量测试**
+- [x] **Step 3: 运行后端全量测试**
 
 Run:
 ```
@@ -813,7 +813,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`，全部测试通过。
 
-- [ ] **Step 4: Commit 构建产物**
+- [x] **Step 4: Commit 构建产物**
 
 ```bash
 cd e:\code\odoo
@@ -825,7 +825,7 @@ git commit -m "build(zhao_market_pos): rebuild frontend with hold order unificat
 
 ## Task 10: 最终验证与收尾
 
-- [ ] **Step 1: 检查 git 状态**
+- [x] **Step 1: 检查 git 状态**
 
 Run:
 ```
@@ -834,7 +834,7 @@ git status
 ```
 Expected: working tree clean，所有改动已提交。
 
-- [ ] **Step 2: 最终全量测试**
+- [x] **Step 2: 最终全量测试**
 
 Run:
 ```
@@ -842,7 +842,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`，所有测试通过。
 
-- [ ] **Step 3: 勾选本计划所有 checkbox（完成后统一勾选）**
+- [x] **Step 3: 勾选本计划所有 checkbox（完成后统一勾选）**
 
 人工验收后，将本计划中所有 `- [ ]` 改为 `- [x]`。
 
@@ -850,17 +850,17 @@ Expected: `0 failed, 0 error(s)`，所有测试通过。
 
 ## Self-Review 清单
 
-- [ ] Spec §3.2 数据流：挂单 create_draft→hold_order→push（Task 1, 2, 5, 6, 7）
-- [ ] Spec §3.2 数据流：取单 resume→setLines+pendingOrderId（Task 7）
-- [ ] Spec §3.2 数据流：结账 submit_order 传 order_id 做 draft→paid（Task 1, 8）
-- [ ] Spec §4.1 _create_order_core 抽取 + submit_order 双分支 + create_draft_order（Task 1）
-- [ ] Spec §4.2 /v1/order/create_draft 端点（Task 2）
-- [ ] Spec §4.3 orderCreateDraft + orderSubmit order_id（Task 5）
-- [ ] Spec §4.4 pending.hold() 先 create_draft 再 hold_order（Task 6）
-- [ ] Spec §4.5 confirmHold 调 pendingStore.hold + doResume 调 pendingStore.resume（Task 7）
-- [ ] Spec §4.6 cart.setLines/pendingOrderId/clear 已有（无需新增）
-- [ ] Spec §6.1 6 个新增单元测试（Task 3）
-- [ ] Spec §6.2 E2E 改为 draft 流程（Task 4）
-- [ ] Spec §6.3 2 个 controller 测试（Task 4）
-- [ ] 无 placeholder
-- [ ] 类型一致：hold(holdKey, lines, memberId, sessionId) / selectPending 已删除 / pendingOrderId 命名统一
+- [x] Spec §3.2 数据流：挂单 create_draft→hold_order→push（Task 1, 2, 5, 6, 7）
+- [x] Spec §3.2 数据流：取单 resume→setLines+pendingOrderId（Task 7）
+- [x] Spec §3.2 数据流：结账 submit_order 传 order_id 做 draft→paid（Task 1, 8）
+- [x] Spec §4.1 _create_order_core 抽取 + submit_order 双分支 + create_draft_order（Task 1）
+- [x] Spec §4.2 /v1/order/create_draft 端点（Task 2）
+- [x] Spec §4.3 orderCreateDraft + orderSubmit order_id（Task 5）
+- [x] Spec §4.4 pending.hold() 先 create_draft 再 hold_order（Task 6）
+- [x] Spec §4.5 confirmHold 调 pendingStore.hold + doResume 调 pendingStore.resume（Task 7）
+- [x] Spec §4.6 cart.setLines/pendingOrderId/clear 已有（无需新增）
+- [x] Spec §6.1 6 个新增单元测试（Task 3）
+- [x] Spec §6.2 E2E 改为 draft 流程（Task 4）
+- [x] Spec §6.3 2 个 controller 测试（Task 4）
+- [x] 无 placeholder
+- [x] 类型一致：hold(holdKey, lines, memberId, sessionId) / selectPending 已删除 / pendingOrderId 命名统一
