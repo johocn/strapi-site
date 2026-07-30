@@ -68,37 +68,27 @@
 ```python
 def create_draft_order(self, payload, session_id, user_id):
     """创建 draft 订单（挂单前置）：订单 + 明细 + 会员，无支付。
-    与 hold_order 在同一 savepoint 中调用，hold 失败时 draft 也回滚。
+    不开 savepoint（由调用方控制事务，前端 hold 流程中 create_draft + hold_order 应原子）。
     """
-    with self.env.cr.savepoint():
-        try:
-            order = self._create_order_core(payload, session_id, user_id, state='draft')
-            return {'order_id': order.id, 'name': order.name}
-        except PosServiceError:
-            raise
-        except Exception as e:
-            raise PosServiceError(f"创建 draft 订单失败: {e}") from e
+    try:
+        order = self._create_order_core(payload, session_id, user_id, state='draft')
+        return {'order_id': order.id, 'name': order.name}
+    except PosServiceError:
+        raise
+    except Exception as e:
+        raise PosServiceError(f"创建 draft 订单失败: {e}") from e
 ```
+
+**事务边界说明**：
+- `create_draft_order` 不开 savepoint，由调用方控制事务
+- 前端 `pendingStore.hold()` 调用 `create_draft` + `hold_order` 是两次独立 HTTP 请求，无法在后端做成原子事务
+- MVP 接受 hold 失败后 draft 残留（后续 cron 清理），不阻塞流程
 
 **重构 `_create_order` 为 `_create_order_core`**：
 
-将现有 `_create_order` 中订单创建逻辑抽取为 `_create_order_core(payload, session_id, user_id, state='paid')`，`state` 参数控制订单状态。`_create_order` 改为调用 `_create_order_core(state='paid')`。
+将现有 `_create_order` 中订单 + lines 创建逻辑抽取为 `_create_order_core(payload, session_id, user_id, state='paid')`，`state` 参数控制订单状态。支付逻辑移到 `submit_order` 中。原 `_create_order` 方法删除（逻辑合并到 `submit_order`）。
 
 ```python
-def _create_order(self, payload, session_id, user_id):
-    """提交订单：创建 paid 订单 + 明细 + 支付原子写入。"""
-    with self.env.cr.savepoint():
-        try:
-            order = self._create_order_core(payload, session_id, user_id, state='paid')
-            for pay in payload.get('payments', []):
-                self._apply_payment(order, pay)
-            order.invalidate_recordset()
-            return order
-        except PosServiceError:
-            raise
-        except Exception as e:
-            raise PosServiceError(f"订单提交失败: {e}") from e
-
 def _create_order_core(self, payload, session_id, user_id, state='paid'):
     """订单创建核心逻辑（不含支付）。state='draft' 用于挂单，'paid' 用于正常提交。"""
     session = self.env['pos.session'].browse(session_id)
@@ -120,8 +110,19 @@ def _create_order_core(self, payload, session_id, user_id, state='paid'):
         'salesman_id': user_id,
         'state': state,
     })
+    # 明细（内联 create，复用现有 _create_order 中的 line 创建逻辑）
     for line in payload.get('lines', []):
-        self._create_order_line(order, line)
+        self.env['zhao.market.pos.order.line'].create({
+            'order_id': order.id,
+            'product_id': line['product_id'],
+            'qty': line['qty'],
+            'price_unit': line['price_unit'],
+            'original_price': line.get('original_price', line['price_unit']),
+            'discount': line.get('discount', 100.0),
+            'is_gift': line.get('is_gift', False),
+            'member_price_applied': line.get('member_price_applied', False),
+            'note': line.get('note', ''),
+        })
     return order
 ```
 
@@ -140,17 +141,27 @@ def submit_order(self, payload, session_id, user_id):
                     raise PosServiceError(f"订单 {order_id} 不存在")
                 if order.state != 'draft':
                     raise PosServiceError(f"订单 {order_id} 状态非 draft，无法转换")
-                # 重写 lines（先删旧再建新）
-                order.order_line.unlink()
+                # 重写 lines（先删旧再建新）。注意：字段名是 line_ids（One2many）
+                order.line_ids.unlink()
                 for line in payload.get('lines', []):
-                    self._create_order_line(order, line)
+                    self.env['zhao.market.pos.order.line'].create({
+                        'order_id': order.id,
+                        'product_id': line['product_id'],
+                        'qty': line['qty'],
+                        'price_unit': line['price_unit'],
+                        'original_price': line.get('original_price', line['price_unit']),
+                        'discount': line.get('discount', 100.0),
+                        'is_gift': line.get('is_gift', False),
+                        'member_price_applied': line.get('member_price_applied', False),
+                        'note': line.get('note', ''),
+                    })
                 # 写支付
                 for pay in payload.get('payments', []):
                     self._apply_payment(order, pay)
                 order.write({'state': 'paid'})
                 order.invalidate_recordset()
                 return order
-            # 新建 paid 订单（原逻辑）
+            # 新建 paid 订单（原逻辑：_create_order_core + 支付）
             order = self._create_order_core(payload, session_id, user_id, state='paid')
             for pay in payload.get('payments', []):
                 self._apply_payment(order, pay)
@@ -161,6 +172,11 @@ def submit_order(self, payload, session_id, user_id):
         except Exception as e:
             raise PosServiceError(f"订单提交失败: {e}") from e
 ```
+
+**关键修正**：
+- 字段名是 `line_ids`（One2many），不是 `order_line`
+- 两条分支（draft 转 paid / 新建）都显式调用 `_apply_payment`，原 `_create_order` 中的支付逻辑移到 `submit_order` 中
+- `_create_order_core` 只负责订单 + lines 创建，不含支付
 
 **`hold_order`/`resume_order`/`_order_to_payload`**：保持不变（已是正确实现）。
 
@@ -184,15 +200,27 @@ def order_create_draft(self, **kw):
 
 ### 4.3 前端 `frontend/src/api/client.ts`
 
-**新增 `orderCreateDraft` 函数**：
+**新增 `orderCreateDraft` 函数**（第 92 行后插入）：
 
 ```typescript
 async orderCreateDraft(payload: {
   session_id: number
-  lines: any[]
+  lines: CartLine[]
   member_id: number | null
 }): Promise<ApiResponse<{ order_id: number; name: string }>> {
   return postJson('/order/create_draft', payload)
+}
+```
+
+**修改 `orderSubmit` payload 类型**（第 78-82 行）：
+
+```typescript
+async orderSubmit(payload: {
+  session_id: number; member_id?: number | null
+  order_id?: number | null  // 新增：draft 转 paid 时传入
+  lines: CartLine[]; payments: PaymentItem[]
+}): Promise<ApiResponse<OrderResult>> {
+  return postJson('/order/submit', payload)
 }
 ```
 
@@ -201,7 +229,12 @@ async orderCreateDraft(payload: {
 **修改 `hold()` 方法**：先调 `orderCreateDraft` 拿 order_id，再调 `orderHold`。
 
 ```typescript
-async function hold(holdKey: string, lines: CartLine[], memberId: number | null, sessionId: number): Promise<boolean> {
+async function hold(
+  holdKey: string,
+  lines: CartLine[],
+  memberId: number | null,
+  sessionId: number,
+): Promise<boolean> {
   loading.value = true
   error.value = ''
   try {
@@ -226,11 +259,10 @@ async function hold(holdKey: string, lines: CartLine[], memberId: number | null,
       return false
     }
     const orderId = draftResp.data.order_id
-    // 2. 挂单（hold_order 在后端与 draft 在不同 savepoint，但 hold 失败时 draft 仍存在，需手动清理）
+    // 2. 挂单（hold_order 与 create_draft 是两次独立请求，hold 失败时 draft 残留，MVP 接受）
     const holdResp = await api.orderHold(orderId, holdKey)
     if (!holdResp.ok) {
       error.value = holdResp.error
-      // TODO: draft 订单清理（MVP 不处理，后续 cron 清理超时 draft）
       return false
     }
     orders.value.push({
@@ -247,7 +279,7 @@ async function hold(holdKey: string, lines: CartLine[], memberId: number | null,
 }
 ```
 
-**`resume()` 方法**：保持不变（已正确调用后端 `orderResume`）。
+**`resume()` 方法**：保持不变（已正确调用后端 `orderResume`，返回 `{order_id, member_id, lines}`）。
 
 ### 4.5 前端 `frontend/src/views/CashierView.vue`
 
@@ -287,36 +319,47 @@ async function doResume(holdKey: string) {
   }
   cart.clear()
   cart.setLines(held.lines)
-  if (held.member_id) {
-    // 重新查会员（resume_order 返回的 payload 含 member_id，前端需查会员详情）
-    // 简化：若 cart store 有 setMemberById 方法则调用，否则留给后续优化
-  }
+  // 保存 draft order_id，结账时 submit_order 传给后端做 draft→paid 转换
+  cart.pendingOrderId = held.order_id
+  // 会员恢复：resume 返回 member_id，若需完整 MemberInfo 则调 /member/lookup
+  // MVP 简化：仅恢复 lines，会员需收银员重新扫或输入手机号
   showResumeDialog.value = false
 }
 ```
 
-**修改结账提交**：`submitOrder` payload 中加入 `order_id`（若来自取单）。
+**修改 `submitOrder`**（CheckoutView.vue）：payload 中加入 `order_id`（从 `cart.pendingOrderId` 取）。
 
 ```typescript
 async function submitOrder() {
   // ... 现有 payload 构造
   const payload = {
     session_id: session.sessionId,
-    order_id: pendingOrderOrderId || null,  // 取单后的 order_id，null 表示新建
+    order_id: cart.pendingOrderId,  // 取单后的 draft order_id，null 表示新建
     lines: [...],
     payments: [...],
   }
-  // ... 其余不变
+  const resp = await api.orderSubmit(payload)
+  if (resp.ok) {
+    // ... 成功处理
+    cart.clear()  // clear 会重置 pendingOrderId = null
+  } else {
+    // ... 失败处理（聚合码修复已有）
+  }
 }
 ```
 
-需在 `doResume` 中保存 `pendingOrderOrderId`（取单后的 order_id），结账后清空。
+**关键点**：
+- `cart.pendingOrderId` 已存在（cart.ts 第 9 行），取单时赋值，结账成功后 `cart.clear()` 自动重置
+- `submitOrder` 在 CheckoutView.vue 中（不在 CashierView），需同步修改
 
 ### 4.6 前端 `frontend/src/stores/cart.ts`
 
-**确认/新增方法**：
-- `setLines(lines: CartLine[])`：批量设置购物车明细（若不存在）
-- `setMemberById(memberId: number)`：按 ID 设置会员（若不存在，需调 `/member/lookup` 或在 resume payload 中含会员详情）
+**已有方法（无需新增）**：
+- `setLines(lines: CartLine[])`：第 85-87 行，已存在
+- `pendingOrderId`：第 9 行，已存在
+- `clear()`：第 78-83 行，已重置 `pendingOrderId = null`
+
+**会员恢复简化**：MVP 不在 resume 时恢复会员（`_order_to_payload` 返回 member_id 但无 MemberInfo），收银员需重新扫会员。后续优化可在 `_order_to_payload` 中增加会员详情字段。
 
 ## 5. 错误处理
 
@@ -335,7 +378,7 @@ async function submitOrder() {
 **新增**：
 - `test_create_draft_order_success`：创建 draft 订单，验证 state='draft' + lines + 无 payments + member 关联
 - `test_submit_order_draft_to_paid`：先 create_draft，再 submit 传 order_id，验证 state='paid' + lines 更新 + payments 创建
-- `test_submit_order_draft_to_paid_lines_replaced`：draft 有 2 条 lines，submit 时传 3 条新 lines，验证最终为 3 条（旧 lines 删除）
+- `test_submit_order_draft_to_paid_lines_replaced`：draft 有 2 条 lines，submit 时传 3 条新 lines，验证最终为 3 条（旧 lines 删除，用 `order.line_ids` 验证）
 - `test_hold_and_resume_with_draft_order`：create_draft → hold → resume → 验证返回 payload 含 lines + member_id
 - `test_submit_order_non_draft_fails`：order_id 对应订单 state='paid' 时 submit 应抛错
 - `test_submit_order_nonexistent_order_id_fails`：order_id 不存在时 submit 应抛错
