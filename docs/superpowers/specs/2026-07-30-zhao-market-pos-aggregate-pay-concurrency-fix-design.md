@@ -75,18 +75,42 @@ def _apply_payment(self, order, pay):
     if pending_id:
         # 聚合码：条件 UPDATE 原子认领，避免并发覆盖
         # WHERE pay_status='pending' 确保只有第一个事务能认领
+        # 不修改 amount（防篡改）：顾客扫码时已锁定金额，submit 时仅校验一致
         self.env.cr.execute("""
             UPDATE zhao_market_pos_payment
             SET order_id=%s, pay_status='confirmed', pay_time=NOW(),
-                amount=%s, payment_method=%s
-            WHERE id=%s AND pay_status='pending'
-        """, (order.id, pay['amount'], pay.get('payment_method', 'mixed'), pending_id))
+                poll_status='success', payment_method=%s
+            WHERE id=%s AND pay_status='pending' AND amount=%s
+        """, (order.id, pay.get('payment_method', 'mixed'),
+              pending_id, pay['amount']))
         if self.env.cr.rowcount == 0:
-            raise PosServiceError("聚合码支付已被其他订单认领或状态异常")
+            # 认领失败：可能已被其他订单认领，或金额不匹配
+            payment = self.env['zhao.market.pos.payment'].browse(pending_id)
+            if payment.exists() and payment.pay_status != 'pending':
+                raise PosServiceError("聚合码支付已被其他订单认领")
+            raise PosServiceError("聚合码支付金额不匹配或状态异常")
+        # 失效 ORM 缓存，确保后续读取拿到 UPDATE 后的值
+        self.env['zhao.market.pos.payment'].invalidate_recordset(
+            ['order_id', 'pay_status', 'pay_time', 'poll_status', 'payment_method']
+        )
         return
     # 普通支付：直接创建（config_id 从 order 取）—— 保持不变
-    self.env['zhao.market.pos.payment'].create({...})
+    self.env['zhao.market.pos.payment'].create({
+        'order_id': order.id,
+        'config_id': order.config_id.id,
+        'payment_method': pay['payment_method'],
+        'amount': pay['amount'],
+        'pay_code': pay.get('pay_code', ''),
+        'scan_direction': pay.get('scan_direction', 'b_scan_c'),
+        'pay_status': 'confirmed',
+        'pay_time': fields.Datetime.now(),
+    })
 ```
+
+**关键设计决策**：
+- **不修改 amount**：WHERE 条件加 `AND amount=%s`，金额不匹配时认领失败。顾客扫码输入 100 元，收银员 submit 时 amount 必须也是 100 元，否则报错。防止收银员篡改金额导致对账不平。
+- **同时更新 poll_status='success'**：保持字段语义一致。
+- **invalidate_recordset**：条件 UPDATE 走 `cr.execute` 不经 ORM，需手动失效缓存。
 
 **删除 `confirm_payment` 方法**（第 342-354 行）。
 
@@ -106,27 +130,64 @@ def _apply_payment(self, order, pay):
 
 ### 4.5 前端 `frontend/src/components/AggregatePayPanel.vue`
 
-**删除"确认收款"按钮和 `confirmPending` 调用**（第 64-66 行附近）。
+**UI 改动**：
+- 按钮文案"确认收款" → "选择该支付"（点击即加入 paymentStore.payments，不调后端）
+- 删除 `onConfirm` 中的 `payment.confirmPending(paymentId)` 调用
+- 改为直接 `payment.addPayment({ pending_payment_id, payment_method: 'mixed', amount, scan_direction: 'c_scan_b' })` 并从 `pendingList` 移除
+- `emit('confirm', ...)` 保留，通知父组件已选择
 
-聚合码待支付列表改为"选择该支付方式"交互——点击后将其加入 `paymentStore.payments`（含 `pending_payment_id`），收银员点"提交订单"时一次性认领。
+```typescript
+async function onSelect(paymentId: number) {
+  const item = payment.pendingList.find(p => p.payment_id === paymentId)
+  if (!item) return
+  // 直接加入 payments，不调后端（认领在 submit 时原子完成）
+  payment.addPayment({
+    pending_payment_id: paymentId,
+    payment_method: 'mixed',
+    amount: item.amount,
+    scan_direction: 'c_scan_b',
+  })
+  payment.pendingList = payment.pendingList.filter(p => p.payment_id !== paymentId)
+  payment.selectedPendingId = null
+  emit('confirm', {
+    payment_id: paymentId,
+    amount: item.amount,
+    pay_code: item.pay_code || '',
+    create_date: item.create_date,
+  })
+}
+```
 
 ### 4.6 前端 `frontend/src/views/CheckoutView.vue`
 
-**submit 失败处理**：
+**submit 失败处理**（对齐现有 `if/else` 结构，非 try/catch）：
 
 ```typescript
-async function onSubmit() {
-  try {
-    await api.submitOrder(payload)
-    cartStore.clear()  // 成功才清空
-    // ... 跳转小票页
-  } catch (e) {
-    // 失败：cartStore 不清空，paymentStore 重置，提示换支付方式
-    paymentStore.reset()
-    alert(e.message || '聚合码支付被抢，请选择其他支付方式')
+async function submitOrder() {
+  // ... payload 构造保持不变
+  const resp = await api.orderSubmit(payload)
+  if (resp.ok) {
+    // 成功：打印小票 + 清理 + 返回
+    lastOrder.value = { ... }
+    await nextTick()
+    const html = renderReceiptHtml(lastOrder.value, receiptConfig.value)
+    print(html)
+    cart.clear()
+    payment.reset()
+    emitBack()
+  } else {
+    // 失败：cart 不清空（保留购物车），payment.reset() 清空支付方式
+    // 提示收银员换支付方式重提
+    payment.reset()
+    alert(resp.error || '提交失败，请选择其他支付方式重试')
   }
 }
 ```
+
+**关键点**：
+- 成功分支：`cart.clear()` + `payment.reset()`（原逻辑保持）
+- 失败分支：**不调 `cart.clear()`**（保留购物车）+ `payment.reset()`（清空支付方式）+ 提示换支付方式
+- 收银员改选现金/扫码后，重新点"提交订单"会创建新 order（前一个失败的 order 已被后端事务回滚撤销）
 
 ## 5. 错误处理（B' 策略）
 
@@ -135,7 +196,7 @@ async function onSubmit() {
 | 后端 `_apply_payment` | 抛 `PosServiceError` |
 | 后端 `submit_order` | `savepoint` 回滚，order/lines 全部撤销 |
 | controller | `PosServiceError` → 400 响应 `{ok: false, error: "聚合码支付已被其他订单认领"}` |
-| 前端 `onSubmit` | catch 错误 → 不调 `cartStore.clear()` → `paymentStore.reset()` → 提示换支付方式 |
+| 前端 `submitOrder` | `resp.ok=false` 分支 → 不调 `cart.clear()` → `payment.reset()` → 提示换支付方式 |
 
 ## 6. 测试改动
 
@@ -146,9 +207,10 @@ async function onSubmit() {
 - `test_confirm_payment_*` 相关用例
 
 **新增**：
-- `test_apply_payment_atomic_claim_success`：正常认领 pending → pay_status 变 confirmed, order_id 绑定
-- `test_apply_payment_concurrent_claim_second_fails`：模拟并发——先用 SQL 把 pay_status 改成 confirmed，再调 `_apply_payment` 应抛 `PosServiceError`
-- `test_submit_order_rollback_on_payment_claim_conflict`：submit_order 中 `_apply_payment` 失败时，order 应不存在（事务回滚验证）
+- `test_apply_payment_atomic_claim_success`：正常认领 pending → pay_status 变 confirmed, order_id 绑定, poll_status='success'
+- `test_apply_payment_concurrent_claim_second_fails`：模拟并发——先用 SQL 把 pay_status 改成 confirmed，再调 `_apply_payment` 应抛 `PosServiceError`("已被其他订单认领")
+- `test_apply_payment_amount_mismatch_fails`：pending amount=100，submit 时 pay['amount']=99 → WHERE amount=%s 不匹配 → rowcount=0 → 抛 `PosServiceError`("金额不匹配")，且 pending payment 状态不变（仍 pending）
+- `test_submit_order_rollback_on_payment_claim_conflict`：submit_order 中 `_apply_payment` 失败时，order 应不存在（事务回滚验证），pending payment 状态仍为 pending
 
 ### 6.2 `tests/test_pos_controller.py`
 
