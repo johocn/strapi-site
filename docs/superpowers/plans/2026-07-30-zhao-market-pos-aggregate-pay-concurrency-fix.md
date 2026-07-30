@@ -1,4 +1,4 @@
-# zhao_market_pos 聚合码支付并发资损修复 Implementation Plan
+﻿# zhao_market_pos 聚合码支付并发资损修复 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -33,7 +33,7 @@
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_service.py:208-234`
 
-- [ ] **Step 1: 替换 `_apply_payment` 的 pending 分支**
+- [x] **Step 1: 替换 `_apply_payment` 的 pending 分支**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_service.py` 第 208-234 行（`def _apply_payment` 整个方法体）替换为：
 
@@ -58,7 +58,8 @@
                     raise PosServiceError("聚合码支付已被其他订单认领")
                 raise PosServiceError("聚合码支付金额不匹配或状态异常")
             # 失效 ORM 缓存，确保后续读取拿到 UPDATE 后的值
-            self.env['zhao.market.pos.payment'].invalidate_recordset(
+            # 注意：必须在 browse(id) 的具体 recordset 上调用，空 recordset 不失效任何缓存
+            self.env['zhao.market.pos.payment'].browse(pending_id).invalidate_recordset(
                 ['order_id', 'pay_status', 'pay_time', 'poll_status', 'payment_method']
             )
             return
@@ -75,7 +76,7 @@
         })
 ```
 
-- [ ] **Step 2: 删除 `confirm_payment` 方法**
+- [x] **Step 2: 删除 `confirm_payment` 方法**
 
 删除 `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_service.py` 第 342-354 行的 `confirm_payment` 方法（含方法上方的空行）：
 
@@ -97,7 +98,7 @@
 
 删除后保留 `get_pending_payments` 方法结尾与 `get_shift_summary` 方法之间的空行分隔。
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /d e:\code\odoo
@@ -112,7 +113,7 @@ git commit -m "refactor(zhao_market_pos): atomic claim pending payment via condi
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_controller.py:216-224`
 
-- [ ] **Step 1: 删除 `payment_confirm` 端点**
+- [x] **Step 1: 删除 `payment_confirm` 端点**
 
 删除 `e:\code\odoo\custom-addons\zhao_market_pos\controllers\pos_controller.py` 第 216-224 行：
 
@@ -128,7 +129,7 @@ git commit -m "refactor(zhao_market_pos): atomic claim pending payment via condi
         return self._call(self._service().confirm_payment, int(payment_id))
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd /d e:\code\odoo
@@ -143,7 +144,7 @@ git commit -m "refactor(zhao_market_pos): remove deprecated /payment/confirm end
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_service.py`
 
-- [ ] **Step 1: 删除 `test_submit_order_with_aggregate_payment` 旧测试**
+- [x] **Step 1: 删除 `test_submit_order_with_aggregate_payment` 旧测试**
 
 删除 `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_service.py` 第 388-402 行（依赖 `confirm_payment` 的旧聚合码测试）：
 
@@ -165,7 +166,7 @@ git commit -m "refactor(zhao_market_pos): remove deprecated /payment/confirm end
         self.assertEqual(order.payment_ids[0].pay_status, 'confirmed')
 ```
 
-- [ ] **Step 2: 删除 `test_get_pending_payments` 中对 confirm_payment 的依赖**
+- [x] **Step 2: 删除 `test_get_pending_payments` 中对 confirm_payment 的依赖**
 
 找到第 458-466 行的 `test_get_pending_payments`：
 
@@ -198,7 +199,7 @@ git commit -m "refactor(zhao_market_pos): remove deprecated /payment/confirm end
         self.assertEqual(items[0]['amount'], 8.0)
 ```
 
-- [ ] **Step 3: 删除 `test_confirm_payment_idempotent`**
+- [x] **Step 3: 删除 `test_confirm_payment_idempotent`**
 
 删除第 468-473 行：
 
@@ -211,7 +212,7 @@ git commit -m "refactor(zhao_market_pos): remove deprecated /payment/confirm end
         self.assertTrue(self.service.confirm_payment(pid))
 ```
 
-- [ ] **Step 4: 新增 `test_apply_payment_atomic_claim_success`**
+- [x] **Step 4: 新增 `test_apply_payment_atomic_claim_success`**
 
 在 `test_get_pending_payments` 方法后追加（原 `test_confirm_payment_idempotent` 的位置）：
 
@@ -236,7 +237,7 @@ git commit -m "refactor(zhao_market_pos): remove deprecated /payment/confirm end
         self.assertEqual(payment.order_id, order)
 ```
 
-- [ ] **Step 5: 新增 `test_apply_payment_concurrent_claim_second_fails`**
+- [x] **Step 5: 新增 `test_apply_payment_concurrent_claim_second_fails`**
 
 紧接上一测试后追加：
 
@@ -264,7 +265,7 @@ git commit -m "refactor(zhao_market_pos): remove deprecated /payment/confirm end
         self.assertIn("已被其他订单认领", str(ctx.exception))
 ```
 
-- [ ] **Step 6: 新增 `test_apply_payment_amount_mismatch_fails`**
+- [x] **Step 6: 新增 `test_apply_payment_amount_mismatch_fails`**
 
 紧接上一测试后追加：
 
@@ -289,7 +290,7 @@ git commit -m "refactor(zhao_market_pos): remove deprecated /payment/confirm end
         self.assertFalse(payment.order_id)
 ```
 
-- [ ] **Step 7: 新增 `test_submit_order_rollback_on_payment_claim_conflict`**
+- [x] **Step 7: 新增 `test_submit_order_rollback_on_payment_claim_conflict`**
 
 紧接上一测试后追加：
 
@@ -319,7 +320,7 @@ git commit -m "refactor(zhao_market_pos): remove deprecated /payment/confirm end
         self.assertEqual(order_count_after, order_count_before)
 ```
 
-- [ ] **Step 8: 运行测试验证全部通过**
+- [x] **Step 8: 运行测试验证全部通过**
 
 Run:
 ```bash
@@ -328,7 +329,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`，日志中包含新增的 4 个测试用例名。
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 cd /d e:\code\odoo
@@ -344,7 +345,7 @@ git commit -m "test(zhao_market_pos): replace confirm_payment tests with atomic 
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_controller.py`
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_cashier_e2e.py`
 
-- [ ] **Step 1: 删除 controller 中 `test_payment_confirm_missing_payment_id`**
+- [x] **Step 1: 删除 controller 中 `test_payment_confirm_missing_payment_id`**
 
 删除 `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_pos_controller.py` 第 185-188 行：
 
@@ -355,7 +356,7 @@ git commit -m "test(zhao_market_pos): replace confirm_payment tests with atomic 
         self.assertEqual(code, 400)
 ```
 
-- [ ] **Step 2: 修改 E2E `test_e2e_aggregate_pay_full_flow`**
+- [x] **Step 2: 修改 E2E `test_e2e_aggregate_pay_full_flow`**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_cashier_e2e.py` 第 200-240 行的整个 `test_e2e_aggregate_pay_full_flow` 方法替换为：
 
@@ -402,7 +403,7 @@ git commit -m "test(zhao_market_pos): replace confirm_payment tests with atomic 
         self.assertEqual(len(pending_after), 0)
 ```
 
-- [ ] **Step 3: 修复 E2E 中其他对 `confirm_payment` 的调用**
+- [x] **Step 3: 修复 E2E 中其他对 `confirm_payment` 的调用**
 
 在 `e:\code\odoo\custom-addons\zhao_market_pos\tests\test_cashier_e2e.py` 第 359 行附近查找 `create_pending_payment` + `confirm_payment` 组合，将所有 `self.service.confirm_payment(pid)` 调用删除（这些场景在新流程中由 submit_order 自动认领，无需单独 confirm）。具体搜索：
 
@@ -412,7 +413,7 @@ grep -n "confirm_payment" e:\code\odoo\custom-addons\zhao_market_pos\tests\test_
 
 预期输出应只剩 0 行（全部已删除）。若仍有残留，逐个删除该行。
 
-- [ ] **Step 4: 运行全部测试验证**
+- [x] **Step 4: 运行全部测试验证**
 
 Run:
 ```bash
@@ -421,7 +422,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`，全部测试通过。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 cd /d e:\code\odoo
@@ -437,7 +438,7 @@ git commit -m "test(zhao_market_pos): fix controller and E2E tests for atomic cl
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\api\client.ts:101-103`
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\stores\payment.ts:70-88,114-120`
 
-- [ ] **Step 1: 删除 client.ts 中 `paymentConfirm` 函数**
+- [x] **Step 1: 删除 client.ts 中 `paymentConfirm` 函数**
 
 删除 `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\api\client.ts` 第 101-103 行：
 
@@ -447,7 +448,7 @@ git commit -m "test(zhao_market_pos): fix controller and E2E tests for atomic cl
   }
 ```
 
-- [ ] **Step 2: 修改 payment.ts — 删除 `confirmPending` 方法，新增 `removePendingFromList`**
+- [x] **Step 2: 修改 payment.ts — 删除 `confirmPending` 方法，新增 `removePendingFromList`**
 
 在 `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\stores\payment.ts` 中：
 
@@ -494,7 +495,7 @@ git commit -m "test(zhao_market_pos): fix controller and E2E tests for atomic cl
   }
 ```
 
-- [ ] **Step 3: 修改 payment.ts — 更新 return 暴露**
+- [x] **Step 3: 修改 payment.ts — 更新 return 暴露**
 
 将第 114-120 行的 return 对象中：
 
@@ -520,7 +521,7 @@ git commit -m "test(zhao_market_pos): fix controller and E2E tests for atomic cl
   }
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 cd /d e:\code\odoo
@@ -535,7 +536,7 @@ git commit -m "refactor(zhao_market_pos): replace confirmPending with selectPend
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\components\AggregatePayPanel.vue:28,63-77`
 
-- [ ] **Step 1: 修改按钮文案和事件绑定**
+- [x] **Step 1: 修改按钮文案和事件绑定**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\components\AggregatePayPanel.vue` 第 28 行：
 
@@ -549,7 +550,7 @@ git commit -m "refactor(zhao_market_pos): replace confirmPending with selectPend
         <button @click="onSelect(p.payment_id)">选择该支付</button>
 ```
 
-- [ ] **Step 2: 替换 `onConfirm` 方法为 `onSelect`**
+- [x] **Step 2: 替换 `onConfirm` 方法为 `onSelect`**
 
 将第 63-77 行的 `onConfirm` 方法：
 
@@ -591,7 +592,7 @@ function onSelect(paymentId: number) {
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd /d e:\code\odoo
@@ -606,7 +607,7 @@ git commit -m "refactor(zhao_market_pos): AggregatePayPanel select instead of co
 **Files:**
 - Modify: `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\views\CheckoutView.vue:206-208`
 
-- [ ] **Step 1: 修改 submitOrder 的 else 分支**
+- [x] **Step 1: 修改 submitOrder 的 else 分支**
 
 将 `e:\code\odoo\custom-addons\zhao_market_pos\frontend\src\views\CheckoutView.vue` 第 206-208 行：
 
@@ -627,7 +628,7 @@ git commit -m "refactor(zhao_market_pos): AggregatePayPanel select instead of co
   }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 cd /d e:\code\odoo
@@ -643,7 +644,7 @@ git commit -m "fix(zhao_market_pos): preserve cart on submit failure, reset paym
 - Build output: `e:\code\odoo\custom-addons\zhao_market_pos\static\src\pos\pos.umd.js`
 - Build output: `e:\code\odoo\custom-addons\zhao_market_pos\static\src\pos\pos.css`
 
-- [ ] **Step 1: 前端构建**
+- [x] **Step 1: 前端构建**
 
 Run:
 ```bash
@@ -652,7 +653,7 @@ npm run build
 ```
 Expected: 构建成功，`pos.umd.js` 和 `pos.css` 生成时间戳更新。
 
-- [ ] **Step 2: 验证无残留 `confirmPending` / `paymentConfirm` 引用**
+- [x] **Step 2: 验证无残留 `confirmPending` / `paymentConfirm` 引用**
 
 Run:
 ```bash
@@ -660,7 +661,7 @@ grep -r "confirmPending\|paymentConfirm\|/payment/confirm" e:\code\odoo\custom-a
 ```
 Expected: 无任何匹配输出。
 
-- [ ] **Step 3: 运行后端全量测试**
+- [x] **Step 3: 运行后端全量测试**
 
 Run:
 ```bash
@@ -669,7 +670,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`，全部测试通过。
 
-- [ ] **Step 4: Commit 构建产物**
+- [x] **Step 4: Commit 构建产物**
 
 ```bash
 cd /d e:\code\odoo
@@ -681,7 +682,7 @@ git commit -m "build(zhao_market_pos): rebuild frontend with atomic claim flow"
 
 ## Task 9: 最终验证与提交
 
-- [ ] **Step 1: 全局 grep 确认无残留**
+- [x] **Step 1: 全局 grep 确认无残留**
 
 Run:
 ```bash
@@ -689,7 +690,7 @@ grep -rn "confirm_payment\|confirmPayment\|paymentConfirm" e:\code\odoo\custom-a
 ```
 Expected: 只匹配到 `__pycache__` 和 `static/src/pos/pos.umd.js`（构建产物，无需处理），源码中无残留。
 
-- [ ] **Step 2: 检查 git 状态**
+- [x] **Step 2: 检查 git 状态**
 
 Run:
 ```bash
@@ -698,7 +699,7 @@ git status
 ```
 Expected: working tree clean，所有改动已提交。
 
-- [ ] **Step 3: 最终全量测试**
+- [x] **Step 3: 最终全量测试**
 
 Run:
 ```bash
@@ -707,7 +708,7 @@ e:\code\odoo\venv\Scripts\python.exe e:\code\odoo\odoo-bin -c e:\code\odoo\odoo.
 ```
 Expected: `0 failed, 0 error(s)`，所有测试通过。
 
-- [ ] **Step 4: 勾选本计划所有 checkbox（完成后统一勾选）**
+- [x] **Step 4: 勾选本计划所有 checkbox（完成后统一勾选）**
 
 人工验收后，将本计划中所有 `- [ ]` 改为 `- [x]`。
 
@@ -715,15 +716,15 @@ Expected: `0 failed, 0 error(s)`，所有测试通过。
 
 ## Self-Review 清单
 
-- [ ] Spec §2 设计决策全部实现（合并原子操作、B' 策略、条件 UPDATE、删+改测试）
-- [ ] Spec §4.1 后端 _apply_payment 条件 UPDATE + amount 不修改 + poll_status + invalidate_recordset
-- [ ] Spec §4.2 删除 /v1/payment/confirm 端点
-- [ ] Spec §4.3 删除 client.ts paymentConfirm
-- [ ] Spec §4.4 删除 payment.ts confirmPending，新增 selectPending
-- [ ] Spec §4.5 AggregatePayPanel onSelect 不调后端
-- [ ] Spec §4.6 CheckoutView 失败分支 payment.reset() + 保留 cart
-- [ ] Spec §6.1 删除 3 个旧测试，新增 4 个原子认领测试
-- [ ] Spec §6.2 删除 controller confirm 测试
-- [ ] Spec §6.3 E2E 改为单步 submit 认领
-- [ ] 无 placeholder
-- [ ] 类型一致：selectPending / onSelect / pending_payment_id 命名统一
+- [x] Spec §2 设计决策全部实现（合并原子操作、B' 策略、条件 UPDATE、删+改测试）
+- [x] Spec §4.1 后端 _apply_payment 条件 UPDATE + amount 不修改 + poll_status + invalidate_recordset
+- [x] Spec §4.2 删除 /v1/payment/confirm 端点
+- [x] Spec §4.3 删除 client.ts paymentConfirm
+- [x] Spec §4.4 删除 payment.ts confirmPending，新增 selectPending
+- [x] Spec §4.5 AggregatePayPanel onSelect 不调后端
+- [x] Spec §4.6 CheckoutView 失败分支 payment.reset() + 保留 cart
+- [x] Spec §6.1 删除 3 个旧测试，新增 4 个原子认领测试
+- [x] Spec §6.2 删除 controller confirm 测试
+- [x] Spec §6.3 E2E 改为单步 submit 认领
+- [x] 无 placeholder
+- [x] 类型一致：selectPending / onSelect / pending_payment_id 命名统一

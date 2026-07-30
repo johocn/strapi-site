@@ -90,7 +90,8 @@ def _apply_payment(self, order, pay):
                 raise PosServiceError("聚合码支付已被其他订单认领")
             raise PosServiceError("聚合码支付金额不匹配或状态异常")
         # 失效 ORM 缓存，确保后续读取拿到 UPDATE 后的值
-        self.env['zhao.market.pos.payment'].invalidate_recordset(
+        # 注意：必须在 browse(id) 的具体 recordset 上调用，空 recordset 不失效任何缓存
+        self.env['zhao.market.pos.payment'].browse(pending_id).invalidate_recordset(
             ['order_id', 'pay_status', 'pay_time', 'poll_status', 'payment_method']
         )
         return
