@@ -1,4 +1,4 @@
-import { DefaultLogger, LogLevel, VendureConfig } from '@vendure/core';
+import { configureDefaultOrderProcess, DefaultLogger, LogLevel, VendureConfig } from '@vendure/core';
 import { CjkPlugin } from '@vendure/cjk-plugin';
 import { MemberLevelPlugin } from '@vendure/member-level-plugin';
 import { VcashPosPlugin } from '@vcash/pos-plugin';
@@ -32,6 +32,14 @@ export const config: VendureConfig = {
   },
   paymentOptions: {
     paymentMethodHandlers: [],
+  },
+  orderOptions: {
+    process: [
+      configureDefaultOrderProcess({
+        arrangingPaymentRequiresCustomer: false,
+        arrangingPaymentRequiresShipping: false,
+      }),
+    ],
   },
   logger: new DefaultLogger({ level: LogLevel.Info }),
   plugins: [
