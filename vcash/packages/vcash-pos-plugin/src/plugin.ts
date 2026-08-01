@@ -3,6 +3,9 @@ import { PluginCommonModule, VendurePlugin } from '@vendure/core';
 import gql from 'graphql-tag';
 
 import { posSessionPermission, posTerminalPermission } from './constants';
+import { orderCustomFields } from './custom-fields/order-custom-fields';
+import { orderLineCustomFields } from './custom-fields/order-line-custom-fields';
+import { paymentCustomFields } from './custom-fields/payment-custom-fields';
 import { PosSession } from './entities/pos-session.entity';
 import { PosTerminal } from './entities/pos-terminal.entity';
 import { AdminPosResolver } from './resolvers/admin-pos.resolver';
@@ -111,6 +114,16 @@ const adminSchema = gql`
       posTerminalPermission,
       posSessionPermission,
     ];
+    // 注册 Order/OrderLine/Payment custom fields
+    config.customFields = {
+      ...config.customFields,
+      Order: [...(config.customFields?.Order ?? []), ...orderCustomFields],
+      OrderLine: [
+        ...(config.customFields?.OrderLine ?? []),
+        ...orderLineCustomFields,
+      ],
+      Payment: [...(config.customFields?.Payment ?? []), ...paymentCustomFields],
+    };
     return config;
   },
 })
