@@ -3,7 +3,7 @@
 > 基于 Odoo `zhao_market_pos` 业务蓝本，后端切换为 Vendure，多租户多仓库，从零独立项目实现。
 
 - 创建日期：2026-08-01
-- 状态：Spec（待评审）
+- 状态：Spec（已评审修订 v2）
 - 源参考：`e:\code\odoo\custom-addons\zhao_market_pos`（Odoo 19 + Vue3 POS 收银台）
 - 目标目录：`e:\code\vcash`（独立项目，不存在 Odoo 残留）
 
@@ -46,6 +46,8 @@
 | 外设范围 | 扫码枪 + 电子秤 + 钱箱 + ESC-POS | 完整覆盖中大型超市 |
 | 退货与多终端 | 都在 MVP | 退货是核心场景，多终端覆盖多 POS |
 | 架构方案 | 方案 B（领域分层多插件） | vcash-pos-plugin + vcash-offline-plugin |
+| 收银员账号体系 | Administrator + Admin API | 收银员是店员非顾客，需 Role/Permission 体系 |
+| 商品级会员价 | 按 variant × level 矩阵 | 不同等级对应不同会员价 |
 
 ---
 
@@ -305,10 +307,10 @@ export class PosSession {
   terminal: PosTerminal;
   @ManyToOne(() => StockLocation)
   stockLocation: StockLocation;        // 冗余存快照
-  @ManyToOne(() => User)
-  operator: User;                      // 收银员
-  @ManyToOne(() => User, { nullable: true })
-  approver: User;                      // 店长确认人（可选）
+  @ManyToOne(() => Administrator)
+  operator: Administrator;             // 收银员（Administrator，走 Admin API）
+  @ManyToOne(() => Administrator, { nullable: true })
+  approver: Administrator;             // 店长确认人（可选）
   
   @Column({ type: 'varchar', default: 'open' })
   state: 'open' | 'closed';            // 简化两态
@@ -323,6 +325,8 @@ export class PosSession {
   openingFloat: number;                // 开班备用金
   @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
   closingCash: number;                 // 实交现金（关闭时填）
+  
+  @Column({ nullable: true }) activeOrderId: number;  // 当前活跃 Draft Order ID
   
   // 唯一约束: 一终端同时仅一个 open 状态 session
   // 通过 partial unique index: UNIQUE (terminal_id, state) WHERE state = 'open'
@@ -388,7 +392,34 @@ export const orderLineCustomFields: CustomField[] = [
 
 实现方式：扩展 Vendure `Payment` 实体的 custom fields（`aggregatePayCode`、`aggregatePayStatus`），不新建 PaymentMethod，复用 Vendure 原生 Payment 状态机。PaymentMethod 配置 type=`aggregate`。
 
-### 3.7 Channel / StockLocation 绑定策略
+**超时检测**：用 Vendure JobQueue 注册定时任务，每分钟扫描 `aggregatePayStatus=pending` 且创建时间超过 5 分钟的 Payment，标记为 `failed`。前端轮询支付状态时感知到 failed 后弹窗提示收银员。
+
+### 3.7 ProductVariantMemberPrice 实体（商品级会员价，按等级矩阵）
+
+```typescript
+@Entity()
+export class ProductVariantMemberPrice {
+  @PrimaryGeneratedColumn() id: number;
+  @ManyToOne(() => ProductVariant)
+  variant: ProductVariant;
+  @ManyToOne(() => MemberLevel)  // member-level-plugin 的等级实体
+  level: MemberLevel;
+  @Column({ type: 'int' }) price: number;  // 会员价（分）
+  @CreateDateColumn() createdAt: Date;
+  @UpdateDateColumn() updatedAt: Date;
+  
+  // 唯一约束: UNIQUE (variant_id, level_id)
+}
+```
+
+**折扣计算优先级**：
+1. 查 `ProductVariantMemberPrice` 表（variant × 当前会员 level），命中则用此价
+2. 未命中则用会员等级折扣率（member-level-plugin 的 `MemberLevel.discountRate`）乘以原价
+3. 无会员则原价
+
+**离线缓存**：增量同步 `syncProducts` 时，每个 variant 携带 `memberPrices: [{ levelId, price }]` 数组，存入 IndexedDB products 表。
+
+### 3.8 Channel / StockLocation 绑定策略
 
 | 操作 | 绑定方式 | 备注 |
 |------|---------|------|
@@ -401,11 +432,29 @@ export const orderLineCustomFields: CustomField[] = [
 
 **关键**：不新建任何库存表，完全用 Vendure 原生 `StockMovement`（SALE/RETURN/CORRECTION）+ `Order.stockLocationCode`。
 
-### 3.8 多终端并发与挂单
+### 3.9 多终端并发与挂单
 
 - **多终端并发**：每个 POS 终端开班后创建 Draft Order（Vendure `Order.active=true`），加商品即 `addItemToOrder`。不同终端的 Draft Order 互不影响。结账时状态转换 `AddingItems → ArrangingPayment → PaymentAuthorized → PaymentSettled`。
-- **挂单**：Draft Order 的 custom field `orderType='hold'`。前端按 orderType 过滤显示挂单列表。取单时前端把该 Order 加载到 cart store，结账后 `orderType='sale'`。
+- **挂单**：Draft Order 的 custom field `orderType='hold'`。前端按 orderType 过滤显示挂单列表。取单时前端把该 Order 加载到 cart store，结账后 `orderType='sale'`。**挂单归属校验**：取单 mutation 校验目标 Order 的 `posSessionId.terminalId` 必须等于当前调用者 session 的 terminalId，防止跨终端误取。
 - **并发安全**：同终端二次开班被 partial unique index 阻止；同 Draft Order 多终端操作通过 Vendure 原生 Order 乐观锁（`Order.version` 字段）保护。
+- **活跃 Order 管理**：PosSession.activeOrderId 字段记录当前 Draft Order ID（开班时创建空 Draft Order，结账后置空并新建下一个）。POS 全部 Order 操作通过 Admin API + Administrator 鉴权，不走 Shop API 的 active order 机制。
+
+### 3.10 退货与退款实现
+
+**退货流程**：
+1. 收银员输入原单号查询原 Order（Admin API `sessionOrders` 或按 code 查）
+2. 选择退货商品行 + 退货数量
+3. 调 `createRefundOrder` mutation，服务端创建 `orderType=refund` 的 Order
+4. 退款单 OrderLine 复制原单行（productVariantId/单价/折扣），数量为负
+5. 退货 Order 的 `stockLocationCode` 同原单，Vendure StockMovement 自动回库
+6. 退款 Payment 记录（负金额）
+
+**退款支付方式**：
+- **现金退款**：创建 Payment（method=cash, amount=负数, state=Settled），前端触发钱箱打开
+- **聚合码退款**：MVP 阶段不接支付 API，Payment 标记 `aggregatePayStatus=refunded` + custom field `needsManualRefund=true`，提示收银员"需在支付平台手动退款"
+- **原路退回**（后续）：接微信/支付宝退款 API 后实现
+
+**退货单与原单关联**：退货 Order 的 custom field `refundedOrderId` 指向原单 ID。原单可通过此字段反查所有关联退货单，计算实际净销售。
 
 ---
 
@@ -510,33 +559,59 @@ type ShiftPaymentStat {
 }
 ```
 
-### 4.3 vcash-pos-plugin Shop API
+### 4.3 vcash-pos-plugin Admin API（POS 收银操作）
+
+> **关键决策**：POS 收银员是店员（Administrator），不是顾客（Customer）。所有 POS 收银操作走 Admin API，鉴权用 Administrator token + Role/Permission 体系。不走 Shop API 的 active order 机制，PosSession 自己管理活跃 Order（activeOrderId 字段）。
 
 ```graphql
 extend type Query {
+  # 当前 Administrator 的活跃班次
   myPosSession: PosSession
   
+  # 商品查询（按 Channel 自动隔离，支持条码/分类/名称）
   posProducts(options: PosProductListOptions!): PosProductList!
   
+  # 会员查询（手机号/会员卡号）
   posMember(query: String!): PosMember
   
+  # 挂单列表（当前 session 内 orderType=hold 的订单，含归属校验）
   heldOrders: [Order!]!
   
+  # 班次内所有订单（交班对账用）
   sessionOrders(sessionId: ID!): [Order!]!
+  
+  # 聚合码支付状态查询（前端轮询）
+  aggregatePayStatus(paymentId: ID!): Payment!
 }
 
 extend type Mutation {
+  # 开班（前端调用，传入 terminalCode + openingFloat）
   openSession(input: OpenSessionInput!): PosSession!
   
+  # 关班
   closeSession(input: CloseSessionInput!): CloseSessionResult!
   
+  # 加商品到当前活跃 Draft Order（自动注入 stockLocationCode）
   addPosItem(input: AddPosItemInput!): Order!
   
+  # 修改行（数量/折扣/赠品）
   updatePosItem(input: UpdatePosItemInput!): Order!
   
+  # 结账（封装 transitionToState + settlePayment）
   checkoutPosOrder(input: CheckoutPosOrderInput!): CheckoutResult!
   
+  # 聚合码: 创建待确认支付
   createPendingAggregatePay(input: CreatePendingPayInput!): Payment!
+  
+  # 聚合码: 收银员手点确认
+  confirmAggregatePay(paymentId: ID!): Payment!
+  
+  # 挂单/取单（含归属校验：只能取本终端挂单）
+  holdOrder(orderId: ID!): Order!
+  resumeOrder(orderId: ID!): Order!
+  
+  # 退货（创建 orderType=refund 的 Order）
+  createRefundOrder(input: CreateRefundOrderInput!): RefundOrderResult!
 }
 
 type PosProduct {
@@ -545,12 +620,18 @@ type PosProduct {
   name: String!
   barcode: String
   sku: String!
-  price: Decimal!
+  price: Decimal!                # Channel 定价
   category: PosCategory
-  uom: String
+  uom: String                    # 单位（件/kg）
   isWeighted: Boolean!
-  stockLevel: Int!
-  memberPrice: Decimal
+  stockLevel: Int!               # 当前门店库存（按 StockLocation 查）
+  memberPrices: [VariantMemberPrice!]!  # 按等级的会员价列表
+}
+
+type VariantMemberPrice {
+  levelId: ID!
+  levelName: String!
+  price: Decimal!
 }
 
 type PosMember {
@@ -558,21 +639,28 @@ type PosMember {
   name: String!
   mobile: String!
   level: MemberLevel!
-  discountRate: Int!
+  discountRate: Int!             # 等级折扣 88=88折
 }
 
 type CloseSessionResult {
   session: PosSession!
   summary: ShiftSummary!
 }
+
+type CheckoutResult {
+  order: Order!
+  payments: [Payment!]!
+  receiptData: ReceiptData!      # 直接返回票据数据供前端打印
+}
 ```
 
-### 4.4 vcash-offline-plugin API
+### 4.4 vcash-offline-plugin Admin API
 
 ```graphql
 extend type Mutation {
   syncOrders(input: SyncOrdersInput!): SyncOrdersResult!
   syncPayments(input: SyncPaymentsInput!): SyncPaymentsResult!
+  syncSessions(input: SyncSessionsInput!): SyncSessionsResult!
 }
 
 type SyncOrdersResult {
@@ -593,7 +681,7 @@ type SyncFailure {
 }
 ```
 
-### 4.5 增量同步查询
+### 4.5 增量同步 Admin API
 
 ```graphql
 extend type Query {
@@ -640,16 +728,25 @@ plugins: [
 
 ### 4.7 鉴权与权限模型
 
+> **关键变更**：POS 收银操作全部走 Admin API，收银员用 Administrator 账号 + Role/Permission 体系鉴权。
+
 | API | 调用方 | 鉴权 | 权限标识 |
 |-----|-------|------|---------|
 | Admin posTerminals/sessions CRUD | 店长/管理员 | Admin API + Channel 限定 | `PosTerminal.Read/Create/Update/Delete`, `PosSession.Read/Close` |
-| Admin createRefundOrder | 店长/管理员 | Admin API | `Order.Refund.Create` |
-| Shop openSession/closeSession | 收银员 | Shop API + Customer/Owner 账号 | 已登录 + terminal.active |
-| Shop addPosItem/checkoutPosOrder | 收银员 | Shop API + 活跃 session | 已登录 + session.operator=当前用户 |
-| Shop posProducts/posMember | 收银员 | Shop API + 活跃 session | 已登录 |
-| Shop syncOrders/syncPayments | 收银员 | Shop API + 活跃 session | 已登录 + 客户端时间戳校验 |
+| Admin POS 收银操作（openSession/addPosItem/checkoutPosOrder 等） | 收银员 | Admin API + Administrator | `PosSession.Open/Close`, `PosOrder.AddItem/Checkout`, `PosProduct.Read`, `PosMember.Read` |
+| Admin createRefundOrder | 店长/收银员 | Admin API | `Order.Refund.Create` |
+| Admin syncOrders/syncPayments | 收银员 | Admin API + 活跃 session | `PosOrder.Sync` |
+| Admin syncProducts/syncMembers | 收银员 | Admin API + 活跃 session | `PosProduct.Sync`, `PosMember.Sync` |
 
-**关键约束**：所有 Shop API 的 POS 操作都要求当前用户有活跃 PosSession（中间件校验），防止跳过开班直接收银。
+**关键约束**：
+1. 所有 POS 操作都要求当前 Administrator 有活跃 PosSession（中间件校验），防止跳过开班直接收银
+2. Administrator 通过 Role 绑定 Channel（cjk-plugin 提供），收银员只能操作自己 Channel 的数据
+3. 前端登录后选择 terminalCode，服务端校验该 terminal 属于当前 Administrator 的 Channel
+
+**Administrator Role 定义**：
+- `cashier`（收银员）：PosSession.Open/Close, PosOrder.*, PosProduct.Read, PosMember.Read
+- `shift-manager`（店长）：cashier 权限 + PosSession.Approve, Order.Refund.Create
+- `tenant-admin`（租户管理员）：全部权限 + PosTerminal.*, PosSession.*
 
 ---
 
@@ -668,6 +765,8 @@ plugins: [
 | 结账完成 | ✓（前端视为成功，后台异步落库） | - |
 | 交班 | ✓（本地生成对账单，关闭时一并同步） | 店长在线确认（离线时跳过，联网后补） |
 | 班次开/关 | ✓（终端本地状态机） | - |
+| 会员识别 | ✓（本地缓存查询） | 本地未命中时提示"按非会员处理或联网" |
+| 退货退款 | ✓（现金退款直接从钱箱出，记录入队列） | 聚合码原路退回（MVP 标记"需人工退款"） |
 
 **核心原则**：断网时收银不中断，所有"事务"在前端 IndexedDB 内闭环完成；联网后按队列顺序同步到后端，后端做幂等校验和库存校验。
 
@@ -1130,6 +1229,8 @@ ESC-POS 指令打印
 保存为 PDF 下载
 ```
 
+**ESC-POS 中文编码**：默认编码不支持中文，`buildReceiptCommands` 开头需发 `FS &`（0x1c 0x26）切换中文模式，文字用 GBK 编码（`TextEncoder` 不支持 GBK，需引入 `iconv-lite` 或用 `TextDecoder` 的 GBK polyfill）。部分打印机支持 UTF-8 模式（`GS ( k` 命令），优先尝试 UTF-8，失败回退 GBK。
+
 ### 6.8 设备初始化时机
 
 ```typescript
@@ -1309,7 +1410,57 @@ export interface ReceiptData {
 - 引导连接电子秤、钱箱、打印机
 - 设备状态实时显示
 
-### 7.6 路由与权限
+### 7.6 登录与 Channel/StockLocation 切换
+
+POS 前端启动流程：
+
+```
+[启动]
+  │
+  ▼
+[登录页] Administrator 账号密码
+  │  调 Admin API login mutation → 获取 vendure-token
+  │
+  ▼
+[选门店页] 列出当前 Administrator 可访问的 Channel + StockLocation
+  │  前端存储选中的 channelId + stockLocationId + terminalCode
+  │  Apollo 客户端注入 channelToken header
+  │
+  ▼
+[SetupView] 设备初始化（首次）
+  │
+  ▼
+[CashierView] 开班 → 收银
+```
+
+```typescript
+// web/src/api/graphql-client.ts
+const apolloClient = new ApolloClient({
+  link: createHttpLink({
+    uri: '/admin-api',
+    headers: () => {
+      const token = useAuthStore().token;
+      return token ? { Authorization: `Bearer ${token}` } : {};
+    },
+  }),
+  cache: new InMemoryCache(),
+});
+
+// 选门店后，Channel 切换通过 Vendure 的 channelToken header
+function setChannel(channelToken: string) {
+  apolloClient.link = createHttpLink({
+    uri: '/admin-api',
+    headers: {
+      Authorization: `Bearer ${useAuthStore().token}`,
+      'vendure-token': channelToken,  // Channel 隔离
+    },
+  });
+}
+```
+
+**登录态持久化**：token + channelId + terminalCode 存 localStorage，刷新页面自动恢复。
+
+### 7.7 路由与权限
 
 ```typescript
 const routes = [
@@ -1335,7 +1486,7 @@ router.beforeEach(async (to) => {
 });
 ```
 
-### 7.7 关键改造点（对比 zhao_market_pos）
+### 7.8 关键改造点（对比 zhao_market_pos）
 
 | 维度 | zhao_market_pos | vcash | 改造原因 |
 |------|-----------------|-------|---------|
@@ -1476,6 +1627,11 @@ jobs:
 - HTTPS: 必须（WebUSB/WebSerial 要求 Secure Context）
 - 浏览器: Chrome/Edge 90+（WebUSB/WebSerial 兼容性）
 
+**HTTPS 证书方案**：
+- 公网部署：Let's Encrypt 免费证书（certbot 自动续期）
+- 局域网部署（POS 终端不联公网）：用 `mkcert` 生成本地信任的根证书 + 域名证书，根证书需导入每台 POS 终端的系统信任区
+- 自签证书：不推荐（浏览器 WebUSB 授权会持续警告）
+
 ### 9.3 生产目录结构
 
 ```
@@ -1544,6 +1700,15 @@ VENDURE_TOKEN_SECRET=***
 | 多语言 | 后续 | MVP 仅中文 |
 | 报表 | 后续 | MVP 仅班次对账单 |
 
+### 10.1 历史数据迁移
+
+**MVP 不含 Odoo 历史数据迁移**。理由：
+1. zhao_market_pos 与 vcash 数据模型差异大（Odoo product/member → Vendure ProductVariant/Customer），直接迁移需大量字段映射
+2. POS 历史订单的财务价值低（门店日结后历史订单主要用于查询），可保留 Odoo 系统只读访问
+3. 商品/会员主数据建议重新录入或写一次性脚本从 Odoo 导出 CSV → Vendure populate
+
+**后续如需迁移**：写独立迁移脚本，从 Odoo PostgreSQL 读 → 转换 → Vendure Admin API 写入，不纳入 vcash 主代码库。
+
 ---
 
 ## 11. 风险与缓解
@@ -1556,6 +1721,9 @@ VENDURE_TOKEN_SECRET=***
 | 聚合码支付欺诈 | 收银员误确认 | UI 二次确认 + 金额大字显示 |
 | Vendure 版本升级 | 插件兼容破坏 | @vendure/* 锁定版本，升级前 E2E |
 | 多终端时钟不一致 | LWW 判定错误 | 以服务端接收时间为准，前端仅参考 |
+| Admin API 暴露面扩大 | 收银员权限越界 | Role 最小权限 + 活跃 session 中间件 + Channel 隔离 |
+| 聚合码支付超时未感知 | 顾客已付但收银员标 failed | JobQueue 扫描 + 前端轮询双保险，failed 前弹窗二次确认 |
+| ESC-POS 中文乱码 | 小票无法识别 | 优先 UTF-8 模式，回退 GBK + iconv-lite |
 
 ---
 
