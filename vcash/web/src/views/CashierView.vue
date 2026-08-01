@@ -322,6 +322,7 @@ onUnmounted(() => {
             结账
           </el-button>
         </el-tooltip>
+        <el-button size="small" @click="router.push('/shift')">班次</el-button>
       </div>
     </header>
 

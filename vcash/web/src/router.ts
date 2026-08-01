@@ -27,6 +27,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/CheckoutView.vue'),
     meta: { requiresAuth: true, requiresSession: true },
   },
+  {
+    path: '/shift',
+    name: 'shift',
+    component: () => import('@/views/ShiftView.vue'),
+    meta: { requiresAuth: true, requiresSession: true },
+  },
   { path: '/', redirect: '/login' },
   { path: '/:pathMatch(.*)*', redirect: '/login' },
 ];

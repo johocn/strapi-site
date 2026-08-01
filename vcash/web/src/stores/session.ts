@@ -9,6 +9,7 @@ export interface PosSession {
   openedAt: string;
   openingFloat: number | null;
   terminal: { id: string; code: string; name: string };
+  operator: { id: string; identifier: string; firstName?: string; lastName?: string };
 }
 
 export interface CloseSessionResult {
@@ -29,6 +30,12 @@ const MY_POS_SESSION = gql`
         code
         name
       }
+      operator {
+        id
+        identifier
+        firstName
+        lastName
+      }
     }
   }
 `;
@@ -45,6 +52,12 @@ const OPEN_SESSION = gql`
         id
         code
         name
+      }
+      operator {
+        id
+        identifier
+        firstName
+        lastName
       }
     }
   }
