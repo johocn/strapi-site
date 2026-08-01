@@ -21,6 +21,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/CashierView.vue'),
     meta: { requiresAuth: true, requiresSession: true },
   },
+  {
+    path: '/checkout',
+    name: 'checkout',
+    component: () => import('@/views/CheckoutView.vue'),
+    meta: { requiresAuth: true, requiresSession: true },
+  },
   { path: '/', redirect: '/login' },
   { path: '/:pathMatch(.*)*', redirect: '/login' },
 ];

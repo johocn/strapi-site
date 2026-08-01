@@ -12,6 +12,8 @@ export default defineConfig({
     proxy: {
       // 请求 /admin-api/* 会被代理到 http://localhost:3000/admin-api/*
       '/admin-api': { target: 'http://localhost:3000', changeOrigin: true },
+      // 商品图片资源代理（featuredAsset.preview 返回 /assets/... 相对路径）
+      '/assets': { target: 'http://localhost:3000', changeOrigin: true },
     },
   },
 });
