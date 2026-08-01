@@ -83,7 +83,8 @@ export class AdminPosResolver {
     const admin = await this.resolveOperator(ctx);
     if (!admin) return null;
     const session = await this.sessionService.findMyOpenSession(Number(admin.id));
-    if (!session || !session.activeOrderId) return null;
+    if (!session) return null;
+    // ensureActiveOrder 会复用已有 activeOrderId 或创建新 Order（结账后 activeOrderId 已清，会创建新空 Order）
     return this.orderService.ensureActiveOrder(ctx, session);
   }
 

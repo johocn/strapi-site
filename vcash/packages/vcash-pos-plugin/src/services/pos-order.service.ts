@@ -152,32 +152,29 @@ export class PosOrderService {
       }
 
       // 2. 逐笔添加 manual payment（内部 Payment 直接 Created → Settled）
+      //    defaultPaymentProcess.onTransitionEnd 会在 Payment 覆盖 total 时
+      //    自动 transition order 到 PaymentSettled，无需手动调用。
       for (const pay of input.payments) {
         const payResult = await this.orderService.addManualPaymentToOrder(txCtx, {
           orderId: order.id,
           method: pay.method,
           transactionId: pay.transactionId,
-          metadata: pay.metadata,
+          metadata: pay.metadata ?? {},
         });
         if ('errorCode' in payResult) {
           throw new UserInputError(`添加支付失败: ${payResult.message}`);
         }
       }
 
-      // 3. ArrangingPayment → PaymentSettled（checkPaymentsCoverTotal 校验支付覆盖 total）
-      const settledResult = await this.orderService.transitionToState(
-        txCtx,
-        order.id,
-        'PaymentSettled',
-      );
-      if ('errorCode' in settledResult) {
-        throw new UserInputError(`转入 PaymentSettled 失败: ${settledResult.message}`);
-      }
-
-      // 收集 Payment 快照
-      const finalOrder = await this.orderService.findOne(txCtx, order.id);
+      // 3. 收集 Payment 快照并校验 order 已到 PaymentSettled
+      const finalOrder = await this.orderService.findOne(txCtx, order.id, ['payments']);
       if (finalOrder) {
         settledPayments.push(...(finalOrder.payments ?? []));
+        if (finalOrder.state !== 'PaymentSettled') {
+          throw new UserInputError(
+            `结账未完成：订单状态为 ${finalOrder.state}，预期 PaymentSettled（支付金额可能不足）`,
+          );
+        }
       }
     });
 
@@ -187,7 +184,7 @@ export class PosOrderService {
     });
     session.activeOrderId = null;
 
-    const finalOrder = await this.orderService.findOne(ctx, order.id);
+    const finalOrder = await this.orderService.findOne(ctx, order.id, ['payments']);
     return { order: finalOrder as Order, payments: settledPayments };
   }
 }
