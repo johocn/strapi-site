@@ -10,6 +10,7 @@ import { PosSession } from './entities/pos-session.entity';
 import { PosTerminal } from './entities/pos-terminal.entity';
 import { AdminPosResolver } from './resolvers/admin-pos.resolver';
 import { AdminTerminalResolver } from './resolvers/admin-terminal.resolver';
+import { PosOrderService } from './services/pos-order.service';
 import { PosSessionService } from './services/pos-session.service';
 import { PosTerminalService } from './services/pos-terminal.service';
 
@@ -94,6 +95,45 @@ const adminSchema = gql`
     openSession(input: OpenSessionInput!): PosSession!
     closeSession(input: CloseSessionInput!): CloseSessionResult!
   }
+
+  input AddPosItemInput {
+    productVariantId: ID!
+    quantity: Int!
+    discount: Int
+    isGift: Boolean
+    note: String
+    originalPrice: Int
+  }
+
+  input UpdatePosItemInput {
+    orderLineId: ID!
+    quantity: Int!
+  }
+
+  input CheckoutPaymentInput {
+    method: String!
+    transactionId: String
+    metadata: JSON
+  }
+
+  input CheckoutInput {
+    payments: [CheckoutPaymentInput!]!
+  }
+
+  type PosCheckoutResult {
+    order: Order!
+    payments: [Payment!]!
+  }
+
+  extend type Query {
+    posActiveOrder: Order
+  }
+
+  extend type Mutation {
+    addPosItem(input: AddPosItemInput!): Order!
+    updatePosItem(input: UpdatePosItemInput!): Order!
+    checkoutPosOrder(input: CheckoutInput!): PosCheckoutResult!
+  }
 `;
 
 @VendurePlugin({
@@ -102,7 +142,7 @@ const adminSchema = gql`
     TypeOrmModule.forFeature([PosTerminal, PosSession]),
   ],
   entities: [PosTerminal, PosSession],
-  providers: [PosTerminalService, PosSessionService],
+  providers: [PosTerminalService, PosSessionService, PosOrderService],
   adminApiExtensions: {
     resolvers: [AdminTerminalResolver, AdminPosResolver],
     schema: adminSchema,

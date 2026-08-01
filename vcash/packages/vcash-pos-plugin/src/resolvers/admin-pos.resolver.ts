@@ -4,12 +4,15 @@ import {
   AdministratorService,
   Allow,
   Ctx,
+  ID,
+  Order,
   RequestContext,
   UserInputError,
 } from '@vendure/core';
 
 import { posSessionPermission } from '../constants';
 import { PosSession } from '../entities/pos-session.entity';
+import { PosOrderService } from '../services/pos-order.service';
 import { PosSessionService } from '../services/pos-session.service';
 
 /**
@@ -21,6 +24,7 @@ export class AdminPosResolver {
   constructor(
     @Inject(PosSessionService) private sessionService: PosSessionService,
     @Inject(AdministratorService) private administratorService: AdministratorService,
+    @Inject(PosOrderService) private orderService: PosOrderService,
   ) {}
 
   /**
@@ -71,6 +75,74 @@ export class AdminPosResolver {
       approverId: input.approverId ? parseInt(input.approverId, 10) : undefined,
     });
     return { session, summary: session.closeSummary };
+  }
+
+  @Query()
+  @Allow(posSessionPermission.Read)
+  async posActiveOrder(@Ctx() ctx: RequestContext): Promise<Order | null> {
+    const admin = await this.resolveOperator(ctx);
+    if (!admin) return null;
+    const session = await this.sessionService.findMyOpenSession(Number(admin.id));
+    if (!session || !session.activeOrderId) return null;
+    return this.orderService.ensureActiveOrder(ctx, session);
+  }
+
+  @Mutation()
+  @Allow(posSessionPermission.Update)
+  async addPosItem(
+    @Args('input') input: {
+      productVariantId: string;
+      quantity: number;
+      discount?: number;
+      isGift?: boolean;
+      note?: string;
+      originalPrice?: number;
+    },
+    @Ctx() ctx: RequestContext,
+  ): Promise<Order> {
+    const admin = await this.resolveOperator(ctx);
+    if (!admin) throw new UserInputError('未登录或非管理员账号');
+    const session = await this.sessionService.findMyOpenSession(Number(admin.id));
+    if (!session) throw new UserInputError('当前无开班班次');
+    return this.orderService.addPosItem(ctx, session, {
+      productVariantId: input.productVariantId,
+      quantity: input.quantity,
+      discount: input.discount,
+      isGift: input.isGift,
+      note: input.note,
+      originalPrice: input.originalPrice,
+    });
+  }
+
+  @Mutation()
+  @Allow(posSessionPermission.Update)
+  async updatePosItem(
+    @Args('input') input: { orderLineId: string; quantity: number },
+    @Ctx() ctx: RequestContext,
+  ): Promise<Order> {
+    const admin = await this.resolveOperator(ctx);
+    if (!admin) throw new UserInputError('未登录或非管理员账号');
+    const session = await this.sessionService.findMyOpenSession(Number(admin.id));
+    if (!session) throw new UserInputError('当前无开班班次');
+    return this.orderService.updatePosItem(ctx, session, {
+      orderLineId: input.orderLineId,
+      quantity: input.quantity,
+    });
+  }
+
+  @Mutation()
+  @Allow(posSessionPermission.Update)
+  async checkoutPosOrder(
+    @Args('input') input: {
+      payments: Array<{ method: string; transactionId?: string; metadata?: any }>;
+    },
+    @Ctx() ctx: RequestContext,
+  ): Promise<{ order: Order; payments: any[] }> {
+    const admin = await this.resolveOperator(ctx);
+    if (!admin) throw new UserInputError('未登录或非管理员账号');
+    const session = await this.sessionService.findMyOpenSession(Number(admin.id));
+    if (!session) throw new UserInputError('当前无开班班次');
+    return this.orderService.checkoutPosOrder(ctx, session, input);
   }
 
   /**
