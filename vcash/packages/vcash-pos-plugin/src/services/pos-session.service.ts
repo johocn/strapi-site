@@ -5,21 +5,22 @@ import { Connection, Like } from 'typeorm';
 
 import { PosSession, ShiftSummary } from '../entities/pos-session.entity';
 import { PosTerminalService } from './pos-terminal.service';
+import { ShiftReportService } from './shift-report.service';
 
 /**
  * 班次生命周期服务：
  * - 开班：校验终端 active + 无 open session → 生成 session code → 持久化
- * - 关班：校验 session open → 标记 closed + 写入 closeSummary（可选）
+ * - 关班：校验 session open → 调用 ShiftReportService 生成 closeSummary → 标记 closed
  * - 查询：findOpenSession / findMySession / findOne
  *
- * 注意：closeSummary 由 ShiftReportService 在 Task 6 生成；当前 closeSession 接受外部传入，
- * 若未传则置 null，等 Task 6 接入。
+ * closeSession 若未显式传入 closeSummary，则调用 ShiftReportService 自动生成。
  */
 @Injectable()
 export class PosSessionService {
   constructor(
     @InjectConnection() private connection: Connection,
     @Inject(PosTerminalService) private terminalService: PosTerminalService,
+    @Inject(ShiftReportService) private shiftReportService: ShiftReportService,
   ) {}
 
   /**
@@ -65,7 +66,8 @@ export class PosSessionService {
   }
 
   /**
-   * 关班。可选传入 closeSummary（Task 6 起 ShiftReportService 生成）。
+   * 关班。若未显式传入 closeSummary，则调用 ShiftReportService 自动生成
+   * （会基于 closingCash 进行现金对账并产出 warnings）。
    */
   async closeSession(input: {
     sessionId: number;
@@ -81,10 +83,20 @@ export class PosSessionService {
       throw new UserInputError(`班次 ${session.code} 已关闭`);
     }
 
+    const closingCash = input.closingCash ?? 0;
+    // 未传 closeSummary 时自动生成（传入 closingCash 触发现金对账）
+    const summary =
+      input.closeSummary !== undefined
+        ? input.closeSummary
+        : await this.shiftReportService.generateSummary(
+            input.sessionId,
+            closingCash,
+          );
+
     session.state = 'closed';
     session.closedAt = new Date();
-    session.closingCash = input.closingCash ?? 0;
-    session.closeSummary = input.closeSummary ?? null;
+    session.closingCash = closingCash;
+    session.closeSummary = summary;
     if (input.approverId) {
       session.approver = { id: input.approverId } as any;
     }

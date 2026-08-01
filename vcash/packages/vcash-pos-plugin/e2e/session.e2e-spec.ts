@@ -5,13 +5,19 @@ import {
   SqljsInitializer,
   testConfig,
 } from '@vendure/testing';
-import { DefaultLogger, LogLevel } from '@vendure/core';
+import { configureDefaultOrderProcess, DefaultLogger, LogLevel } from '@vendure/core';
 import gql from 'graphql-tag';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 import { VcashPosPlugin } from '../src/plugin';
 
 registerInitializer('sqljs', new SqljsInitializer('__data__'));
+
+// 与其他测试一致：配置 order process 确保 Order custom fields 列正确创建
+const posOrderProcess = configureDefaultOrderProcess({
+  arrangingPaymentRequiresCustomer: false,
+  arrangingPaymentRequiresShipping: false,
+});
 
 const CREATE_STOCK_LOCATION = gql`
   mutation CreateStockLocation($name: String!) {
@@ -92,6 +98,7 @@ describe('PosSession 开班/关班', () => {
   const { server, adminClient } = createTestEnvironment({
     ...testConfig,
     logger: new DefaultLogger({ level: LogLevel.Error }),
+    orderOptions: { process: [posOrderProcess] },
     plugins: [VcashPosPlugin],
   });
 
@@ -175,7 +182,7 @@ describe('PosSession 开班/关班', () => {
     expect(result.posSession.state).toBe('open');
   });
 
-  it('应成功关班，state=closed', async () => {
+  it('应成功关班，state=closed，closeSummary 由 ShiftReportService 自动生成', async () => {
     const result = await adminClient.query(CLOSE_SESSION, {
       sessionId,
       closingCash: 48800,
@@ -184,9 +191,14 @@ describe('PosSession 开班/关班', () => {
     expect(result.closeSession.session.state).toBe('closed');
     expect(result.closeSession.session.closingCash).toBe(48800);
     expect(result.closeSession.session.closedAt).toBeTruthy();
-    // 未传 closeSummary，由 Task 6 的 ShiftReportService 注入；此处应为 null
-    expect(result.closeSession.session.closeSummary).toBeNull();
-    expect(result.closeSession.summary).toBeNull();
+    // 未传 closeSummary，由 ShiftReportService 自动生成（本测试无订单，stats 全 0）
+    expect(result.closeSession.session.closeSummary).not.toBeNull();
+    expect(result.closeSession.summary).not.toBeNull();
+    expect(result.closeSession.summary.orders.totalCount).toBe(0);
+    expect(result.closeSession.summary.orders.normalCount).toBe(0);
+    expect(result.closeSession.summary.paymentsByMethod).toEqual([]);
+    // openingFloat=50000，closingCash=48800，无 cash payment → 应交 50000，短款 1200
+    expect(result.closeSession.summary.warnings.length).toBeGreaterThan(0);
     // 关班后清空 activeOrderId
     expect(result.closeSession.session.activeOrderId).toBeNull();
   });

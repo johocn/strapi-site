@@ -6,18 +6,20 @@ import {
   Ctx,
   ID,
   Order,
+  Payment,
   RequestContext,
   UserInputError,
 } from '@vendure/core';
 
 import { posSessionPermission } from '../constants';
-import { PosSession } from '../entities/pos-session.entity';
+import { PosSession, ShiftSummary } from '../entities/pos-session.entity';
+import { AggregatePayService } from '../services/aggregate-pay.service';
 import { PosOrderService } from '../services/pos-order.service';
 import { PosSessionService } from '../services/pos-session.service';
+import { ShiftReportService } from '../services/shift-report.service';
 
 /**
- * POS 收银操作 API：班次生命周期（开班/关班/我的班次）。
- * 后续 Task 5 将在此 resolver 追加 addPosItem / checkoutPosOrder 等。
+ * POS 收银操作 API：班次生命周期（开班/关班/我的班次）+ 交班对账预览 + 聚合码支付。
  */
 @Resolver()
 export class AdminPosResolver {
@@ -25,6 +27,8 @@ export class AdminPosResolver {
     @Inject(PosSessionService) private sessionService: PosSessionService,
     @Inject(AdministratorService) private administratorService: AdministratorService,
     @Inject(PosOrderService) private orderService: PosOrderService,
+    @Inject(ShiftReportService) private shiftReportService: ShiftReportService,
+    @Inject(AggregatePayService) private aggregatePayService: AggregatePayService,
   ) {}
 
   /**
@@ -144,6 +148,107 @@ export class AdminPosResolver {
     const session = await this.sessionService.findMyOpenSession(Number(admin.id));
     if (!session) throw new UserInputError('当前无开班班次');
     return this.orderService.checkoutPosOrder(ctx, session, input);
+  }
+
+  /**
+   * 交班对账单预览：不传 closingCash 则不做现金对账（warnings 为空）。
+   * 用于关班前让收银员预览当前班次汇总。
+   */
+  @Query()
+  @Allow(posSessionPermission.Read)
+  async shiftReportPreview(
+    @Args('sessionId') sessionId: string,
+    @Args('closingCash') closingCash?: number,
+  ): Promise<ShiftSummary> {
+    return this.shiftReportService.generateSummary(
+      parseInt(sessionId, 10),
+      closingCash,
+    );
+  }
+
+  // ===== 聚合码支付 =====
+
+  /**
+   * 创建聚合码待支付 Payment。
+   * 需当前班次有活跃 Order 且购物车非空。
+   */
+  @Mutation()
+  @Allow(posSessionPermission.Update)
+  async createAggregatePay(
+    @Args('input') input: { aggregatePayCode: string },
+    @Ctx() ctx: RequestContext,
+  ): Promise<Payment> {
+    const admin = await this.resolveOperator(ctx);
+    if (!admin) throw new UserInputError('未登录或非管理员账号');
+    const session = await this.sessionService.findMyOpenSession(Number(admin.id));
+    if (!session) throw new UserInputError('当前无开班班次');
+    return this.aggregatePayService.createPendingPayment(ctx, session, input);
+  }
+
+  /**
+   * 确认聚合码支付（客户已扫码付款）。
+   * Payment: Created → Authorized
+   */
+  @Mutation()
+  @Allow(posSessionPermission.Update)
+  async confirmAggregatePay(
+    @Args('paymentId') paymentId: string,
+    @Ctx() ctx: RequestContext,
+  ): Promise<Payment> {
+    return this.aggregatePayService.confirmPayment(ctx, paymentId);
+  }
+
+  /**
+   * 结算聚合码支付（关班时批量结算或单笔结算）。
+   * Payment: Authorized → Settled
+   */
+  @Mutation()
+  @Allow(posSessionPermission.Update)
+  async settleAggregatePay(
+    @Args('paymentId') paymentId: string,
+    @Ctx() ctx: RequestContext,
+  ): Promise<Payment> {
+    return this.aggregatePayService.settlePayment(ctx, paymentId);
+  }
+
+  /**
+   * 标记聚合码支付失败（超时）。
+   * Payment: Created → Cancelled
+   */
+  @Mutation()
+  @Allow(posSessionPermission.Update)
+  async failAggregatePay(
+    @Args('paymentId') paymentId: string,
+    @Ctx() ctx: RequestContext,
+  ): Promise<Payment> {
+    return this.aggregatePayService.failPayment(ctx, paymentId);
+  }
+
+  /**
+   * 批量结算班次内所有 confirmed 状态的聚合码支付。
+   * 返回结算笔数。
+   */
+  @Mutation()
+  @Allow(posSessionPermission.Update)
+  async settleSessionAggregatePays(
+    @Args('sessionId') sessionId: string,
+    @Ctx() ctx: RequestContext,
+  ): Promise<number> {
+    return this.aggregatePayService.settleSessionPayments(
+      ctx,
+      parseInt(sessionId, 10),
+    );
+  }
+
+  /**
+   * 根据聚合码查询 Payment 状态。
+   */
+  @Query()
+  @Allow(posSessionPermission.Read)
+  async aggregatePayByCode(
+    @Args('aggregatePayCode') aggregatePayCode: string,
+  ): Promise<Payment | null> {
+    return this.aggregatePayService.findByCode(aggregatePayCode);
   }
 
   /**

@@ -9,10 +9,14 @@ import { paymentCustomFields } from './custom-fields/payment-custom-fields';
 import { PosSession } from './entities/pos-session.entity';
 import { PosTerminal } from './entities/pos-terminal.entity';
 import { AdminPosResolver } from './resolvers/admin-pos.resolver';
+import { AdminRefundResolver } from './resolvers/admin-refund.resolver';
 import { AdminTerminalResolver } from './resolvers/admin-terminal.resolver';
+import { AggregatePayService } from './services/aggregate-pay.service';
 import { PosOrderService } from './services/pos-order.service';
 import { PosSessionService } from './services/pos-session.service';
 import { PosTerminalService } from './services/pos-terminal.service';
+import { RefundService } from './services/refund.service';
+import { ShiftReportService } from './services/shift-report.service';
 
 const adminSchema = gql`
   type PosTerminal {
@@ -127,12 +131,47 @@ const adminSchema = gql`
 
   extend type Query {
     posActiveOrder: Order
+    shiftReportPreview(sessionId: ID!, closingCash: Int): JSON!
+    aggregatePayByCode(aggregatePayCode: String!): Payment
+    posRefunds(sessionId: ID!): [Refund!]!
   }
 
   extend type Mutation {
     addPosItem(input: AddPosItemInput!): Order!
     updatePosItem(input: UpdatePosItemInput!): Order!
     checkoutPosOrder(input: CheckoutInput!): PosCheckoutResult!
+    createAggregatePay(input: CreateAggregatePayInput!): Payment!
+    confirmAggregatePay(paymentId: ID!): Payment!
+    settleAggregatePay(paymentId: ID!): Payment!
+    failAggregatePay(paymentId: ID!): Payment!
+    settleSessionAggregatePays(sessionId: ID!): Int!
+    createPosRefund(input: CreatePosRefundInput!): Refund!
+    settleManualRefund(input: SettleManualRefundInput!): Refund!
+  }
+
+  input CreateAggregatePayInput {
+    aggregatePayCode: String!
+  }
+
+  input CreatePosRefundInput {
+    originalOrderId: ID!
+    paymentId: ID!
+    amount: Int!
+    reason: String
+  }
+
+  input SettleManualRefundInput {
+    refundId: ID!
+    transactionId: String!
+  }
+
+  # 扩展核心类型：暴露 Payment.order 和 Refund.payment 便于 POS 场景查询
+  extend type Payment {
+    order: Order!
+  }
+
+  extend type Refund {
+    payment: Payment!
   }
 `;
 
@@ -142,9 +181,16 @@ const adminSchema = gql`
     TypeOrmModule.forFeature([PosTerminal, PosSession]),
   ],
   entities: [PosTerminal, PosSession],
-  providers: [PosTerminalService, PosSessionService, PosOrderService],
+  providers: [
+    PosTerminalService,
+    PosSessionService,
+    PosOrderService,
+    ShiftReportService,
+    AggregatePayService,
+    RefundService,
+  ],
   adminApiExtensions: {
-    resolvers: [AdminTerminalResolver, AdminPosResolver],
+    resolvers: [AdminTerminalResolver, AdminPosResolver, AdminRefundResolver],
     schema: adminSchema,
   },
   configuration: (config) => {
