@@ -1,3 +1,5 @@
+import { CrudPermissionDefinition } from '@vendure/core';
+
 export const POS_PERMISSIONS = {
   TERMINAL_READ: 'PosTerminal.Read',
   TERMINAL_CREATE: 'PosTerminal.Create',
@@ -14,6 +16,13 @@ export const POS_PERMISSIONS = {
   MEMBER_READ: 'PosMember.Read',
   ORDER_SYNC: 'PosOrder.Sync',
 } as const;
+
+/**
+ * PosTerminal CRUD 权限定义（用于 @Allow 装饰器与 authOptions.customPermissions 注册）。
+ * 生成 CreatePosTerminal / ReadPosTerminal / UpdatePosTerminal / DeletePosTerminal 四个权限。
+ */
+export const posTerminalPermission = new CrudPermissionDefinition('PosTerminal');
+
 
 export const POS_SESSION_STATE = {
   OPEN: 'open',
