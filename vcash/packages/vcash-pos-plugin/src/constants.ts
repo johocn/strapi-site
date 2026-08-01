@@ -23,6 +23,11 @@ export const POS_PERMISSIONS = {
  */
 export const posTerminalPermission = new CrudPermissionDefinition('PosTerminal');
 
+/**
+ * PosSession CRUD 权限定义。Create/Update 对应开班/关班动作。
+ */
+export const posSessionPermission = new CrudPermissionDefinition('PosSession');
+
 
 export const POS_SESSION_STATE = {
   OPEN: 'open',
