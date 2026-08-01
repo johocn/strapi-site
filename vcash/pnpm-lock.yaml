@@ -16,8 +16,30 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
+  packages/vcash-pos-plugin:
+    dependencies:
+      '@vendure/core':
+        specifier: 3.6.4
+        version: 3.6.4(@types/express@4.17.25)(better-sqlite3@11.10.0)(sql.js@1.14.1)(ts-node@10.9.2(@types/node@20.19.43)(typescript@5.9.3))(typescript@5.9.3)
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.43
+      '@vendure/testing':
+        specifier: 3.6.4
+        version: 3.6.4
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.43)
+
   server:
     dependencies:
+      '@vcash/pos-plugin':
+        specifier: file:../packages/vcash-pos-plugin
+        version: link:../packages/vcash-pos-plugin
       '@vendure/asset-server-plugin':
         specifier: 3.6.4
         version: 3.6.4
@@ -3320,7 +3342,7 @@ snapshots:
 
   '@graphql-tools/schema@10.0.23(graphql@16.14.2)':
     dependencies:
-      '@graphql-tools/merge': 9.0.24(graphql@16.14.2)
+      '@graphql-tools/merge': 9.2.2(graphql@16.14.2)
       '@graphql-tools/utils': 10.8.6(graphql@16.14.2)
       graphql: 16.14.2
       tslib: 2.8.1
@@ -5076,7 +5098,7 @@ snapshots:
     dependencies:
       config-chain: 1.1.13
       editorconfig: 1.0.7
-      glob: 10.4.5
+      glob: 10.5.0
       js-cookie: 3.0.8
       nopt: 7.2.1
 

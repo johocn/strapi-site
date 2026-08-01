@@ -16,6 +16,7 @@
     "@vendure/email-plugin": "3.6.4",
     "@vendure/cjk-plugin": "file:../../vendure/packages/cjk-plugin",
     "@vendure/member-level-plugin": "file:../../vendure/packages/member-level-plugin",
+    "@vcash/pos-plugin": "file:../packages/vcash-pos-plugin",
     "better-sqlite3": "^11.0.0"
   },
   "devDependencies": {

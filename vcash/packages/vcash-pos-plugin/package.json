@@ -1,0 +1,24 @@
+{
+  "name": "@vcash/pos-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@vendure/core": "3.6.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "@types/node": "^20.0.0",
+    "@vendure/testing": "3.6.4",
+    "vitest": "^1.6.0"
+  },
+  "peerDependencies": {
+    "@vendure/core": "3.6.4"
+  }
+}
