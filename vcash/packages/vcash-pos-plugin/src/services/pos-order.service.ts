@@ -13,6 +13,24 @@ import { Connection } from 'typeorm';
 
 import { PosSession } from '../entities/pos-session.entity';
 
+export interface CreateOrderFromOfflineInput {
+  terminalCode: string;
+  orderType: string;
+  lines: Array<{
+    productVariantId: ID;
+    quantity: number;
+    discount?: number;
+    isGift?: boolean;
+    note?: string;
+    originalPrice?: number;
+  }>;
+  payments: Array<{
+    method: string;
+    transactionId?: string;
+    metadata?: any;
+  }>;
+}
+
 /**
  * POS 收银核心服务：
  * - ensureActiveOrder: 班次内有活跃 Order 则复用，否则创建新 Order 并绑定 custom fields
@@ -186,5 +204,77 @@ export class PosOrderService {
 
     const finalOrder = await this.orderService.findOne(ctx, order.id, ['payments']);
     return { order: finalOrder as Order, payments: settledPayments };
+  }
+
+  /**
+   * 离线订单同步入口：创建 Draft Order → 加商品 → 结账。
+   * 不依赖 PosSession（离线订单可能没有对应的服务端班次），直接创建独立 Order。
+   * 库存不足（addItemToOrder 抛 Insufficient stock）→ 抛 code='OUT_OF_STOCK' 错误。
+   */
+  async createOrderFromOffline(
+    ctx: RequestContext,
+    order: CreateOrderFromOfflineInput,
+  ): Promise<Order> {
+    // 1. 创建 Draft Order
+    const newOrder = await this.orderService.create(ctx);
+    await this.connection.getRepository(Order).update(newOrder.id, {
+      customFields: {
+        orderType: order.orderType,
+        terminalCode: order.terminalCode,
+      },
+    });
+
+    // 2. 遍历 lines 加商品
+    for (const line of order.lines) {
+      const discount = line.discount ?? 100;
+      const result = await this.orderService.addItemToOrder(
+        ctx,
+        newOrder.id,
+        line.productVariantId,
+        line.quantity,
+        {
+          originalPrice: line.originalPrice ?? 0,
+          discount,
+          memberPriceApplied: discount < 100,
+          isGift: line.isGift ?? false,
+          note: line.note ?? null,
+        },
+      );
+      if ('errorCode' in result) {
+        const err: Error & { code?: string } = new Error(result.message);
+        if (result.errorCode === 'INSUFFICIENT_STOCK_ERROR') {
+          err.code = 'OUT_OF_STOCK';
+        }
+        throw err;
+      }
+    }
+
+    // 3. 结账：transitionToState ArrangingPayment → addManualPaymentToOrder（事务）
+    await this.transactionalConnection.withTransaction(ctx, async txCtx => {
+      const arrangeResult = await this.orderService.transitionToState(
+        txCtx,
+        newOrder.id,
+        'ArrangingPayment',
+      );
+      if ('errorCode' in arrangeResult) {
+        throw new Error(`转入 ArrangingPayment 失败: ${arrangeResult.message}`);
+      }
+
+      for (const pay of order.payments) {
+        const payResult = await this.orderService.addManualPaymentToOrder(txCtx, {
+          orderId: newOrder.id,
+          method: pay.method,
+          transactionId: pay.transactionId,
+          metadata: pay.metadata ?? {},
+        });
+        if ('errorCode' in payResult) {
+          throw new Error(`添加支付失败: ${payResult.message}`);
+        }
+      }
+    });
+
+    // 4. 返回最终 Order
+    const finalOrder = await this.orderService.findOne(ctx, newOrder.id, ['payments']);
+    return finalOrder as Order;
   }
 }

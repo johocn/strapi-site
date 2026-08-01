@@ -2,6 +2,7 @@ import { configureDefaultOrderProcess, DefaultLogger, LogLevel, VendureConfig } 
 import { CjkPlugin } from '@vendure/cjk-plugin';
 import { MemberLevelPlugin } from '@vendure/member-level-plugin';
 import { VcashPosPlugin } from '@vcash/pos-plugin';
+import { VcashOfflinePlugin } from '@vcash/offline-plugin';
 import { AssetServerPlugin } from '@vendure/asset-server-plugin';
 import { defaultEmailHandlers, EmailPlugin, FileBasedTemplateLoader } from '@vendure/email-plugin';
 import path from 'node:path';
@@ -46,6 +47,7 @@ export const config: VendureConfig = {
     CjkPlugin.init({}),
     MemberLevelPlugin.init({}),
     VcashPosPlugin,
+    VcashOfflinePlugin,
     AssetServerPlugin.init({
       assetUploadDir: path.join(__dirname, 'assets'),
       route: 'assets',
