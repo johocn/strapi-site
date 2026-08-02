@@ -6,7 +6,9 @@ import { gql } from '@apollo/client/core';
 import { apolloClient } from '@/api/client';
 import { useSessionStore } from '@/stores/session';
 import { useCartStore } from '@/stores/cart';
+import { useOfflineStore } from '@/stores/offline';
 import { useScanner } from '@/composables/useScanner';
+import { db, type ProductSnapshot } from '@/db/dexie';
 import ProductGrid, { type ProductCard } from '@/components/ProductGrid.vue';
 import CategoryBar, { type Category } from '@/components/CategoryBar.vue';
 import CartPanel from '@/components/CartPanel.vue';
@@ -114,9 +116,11 @@ interface RawVariant {
 const router = useRouter();
 const sessionStore = useSessionStore();
 const cart = useCartStore();
+const offlineStore = useOfflineStore();
 
 // 顶部班次信息
 const session = computed(() => sessionStore.currentSession);
+const isOnline = computed(() => offlineStore.isOnline);
 
 // 商品列表状态
 const PAGE_SIZE = 20;
@@ -158,7 +162,63 @@ function mapVariant(v: RawVariant): ProductCard {
   };
 }
 
+function mapSnapshot(s: ProductSnapshot): ProductCard {
+  return {
+    productId: String(s.variantId),
+    variantId: String(s.variantId),
+    name: s.name,
+    sku: s.sku,
+    price: s.price,
+    priceWithTax: s.priceWithTax,
+    preview: null,
+  };
+}
+
+/** 离线加载商品：从 IndexedDB 按 name 前缀或全量分页查询 */
+async function loadProductsOffline(reset: boolean) {
+  if (reset) {
+    items.value = [];
+    totalItems.value = 0;
+  }
+  loading.value = true;
+  const mySeq = ++searchSeq;
+  try {
+    const term = debouncedTerm.value.trim();
+    let collection: import('dexie').Collection<ProductSnapshot, number>;
+    if (term) {
+      collection = db.products.where('name').startsWithIgnoreCase(term);
+    } else {
+      collection = db.products.orderBy('updatedAt').reverse();
+    }
+    const page = await collection
+      .offset(items.value.length)
+      .limit(PAGE_SIZE)
+      .toArray();
+    if (mySeq !== searchSeq) return;
+    const mapped = page.map(mapSnapshot);
+    items.value = reset ? mapped : [...items.value, ...mapped];
+    // 离线无精确 totalItems，按已加载量估算以允许 load-more
+    if (page.length === PAGE_SIZE) {
+      totalItems.value = items.value.length + 1;
+    } else {
+      totalItems.value = items.value.length;
+    }
+    if (reset && mapped.length === 0) {
+      ElMessage.info('离线商品缓存为空，请联网同步后重试');
+    }
+  } catch (e) {
+    if (mySeq !== searchSeq) return;
+    ElMessage.error('离线加载商品失败：' + (e instanceof Error ? e.message : ''));
+  } finally {
+    if (mySeq === searchSeq) loading.value = false;
+  }
+}
+
 async function loadProducts(reset: boolean) {
+  if (!isOnline.value) {
+    await loadProductsOffline(reset);
+    return;
+  }
   if (reset) {
     items.value = [];
     totalItems.value = 0;
@@ -208,6 +268,7 @@ async function loadProducts(reset: boolean) {
 }
 
 async function loadCollections() {
+  if (!isOnline.value) return;
   try {
     const { data } = await apolloClient.query({
       query: COLLECTIONS_QUERY,
@@ -239,7 +300,16 @@ watch(selectedCategory, () => {
   loadProducts(true);
 });
 
+// 网络状态切换：重新加载商品列表
+watch(isOnline, () => {
+  loadProducts(true);
+});
+
 function handleSelect(card: ProductCard) {
+  if (!isOnline.value) {
+    ElMessage.warning('离线模式暂不支持加购，请联网后操作');
+    return;
+  }
   cart.addItem(card.variantId, 1).catch((e) => {
     ElMessage.error('加购失败：' + (e instanceof Error ? e.message : ''));
   });
@@ -249,9 +319,34 @@ function handleLoadMore() {
   loadProducts(false);
 }
 
+/** 离线扫码：按 barcode 或 sku 在 IndexedDB 查商品 */
+async function findProductOffline(barcode: string): Promise<ProductSnapshot | null> {
+  try {
+    const byBarcode = await db.products.where('barcode').equals(barcode).first();
+    if (byBarcode) return byBarcode;
+    const bySku = await db.products.where('sku').equals(barcode).first();
+    return bySku ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // 扫码枪：扫码后查 SKU → 加购
 useScanner({
   onScan: async (barcode: string) => {
+    if (!isOnline.value) {
+      try {
+        const snap = await findProductOffline(barcode);
+        if (!snap) {
+          ElMessage.warning(`离线未找到条码对应的商品：${barcode}`);
+          return;
+        }
+        ElMessage.info(`离线找到：${snap.name}（联网后可加购）`);
+      } catch (e) {
+        ElMessage.error('离线扫码查询失败：' + (e instanceof Error ? e.message : ''));
+      }
+      return;
+    }
     try {
       const { data, errors } = await apolloClient.query({
         query: PRODUCT_VARIANT_BY_SKU,
@@ -283,10 +378,12 @@ function handleKeydown(e: KeyboardEvent) {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleKeydown);
-  // 1. 加载已有活跃订单到购物车
-  await cart.loadActiveOrder().catch(() => {
-    // 加载失败不阻断，可在 CartPanel 内重试
-  });
+  // 1. 加载已有活跃订单到购物车（离线时跳过）
+  if (isOnline.value) {
+    await cart.loadActiveOrder().catch(() => {
+      // 加载失败不阻断，可在 CartPanel 内重试
+    });
+  }
   // 2. 加载分类 + 商品列表
   await Promise.all([loadCollections(), loadProducts(true)]);
 });
@@ -315,6 +412,10 @@ onUnmounted(() => {
         <span class="value">
           {{ session?.openedAt ? new Date(session.openedAt).toLocaleString('zh-CN') : '-' }}
         </span>
+        <el-divider direction="vertical" />
+        <span class="net-badge" :class="isOnline ? 'online' : 'offline'">
+          {{ isOnline ? '● 在线' : '● 离线' }}
+        </span>
       </div>
       <div class="actions">
         <el-tooltip content="F1 快捷键" placement="bottom">
@@ -332,7 +433,7 @@ onUnmounted(() => {
         <div class="search-bar">
           <el-input
             v-model="searchTerm"
-            placeholder='搜索商品名称（仅在"全部"分类下生效）'
+            :placeholder="isOnline ? '搜索商品名称（仅在「全部」分类下生效）' : '离线搜索本地商品缓存'"
             clearable
             @input="handleSearchInput"
             @clear="handleSearchInput"
@@ -396,6 +497,20 @@ onUnmounted(() => {
 }
 .terminal-name {
   color: #909399;
+}
+.net-badge {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.net-badge.online {
+  color: #67c23a;
+  background: #f0f9eb;
+}
+.net-badge.offline {
+  color: #f56c6c;
+  background: #fef0f0;
 }
 .main {
   display: flex;

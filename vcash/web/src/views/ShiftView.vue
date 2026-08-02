@@ -5,7 +5,10 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { gql } from '@apollo/client/core';
 import { apolloClient } from '@/api/client';
 import { useSessionStore } from '@/stores/session';
+import { useOfflineStore } from '@/stores/offline';
 import { formatMoney } from '@/utils/format';
+import { db, type OfflineSessionRecord, type ShiftSummary } from '@/db/dexie';
+import { genIdempotencyKey } from '@/utils/idempotency';
 
 const SHIFT_REPORT_PREVIEW = gql`
   query ShiftReportPreview($sessionId: ID!, $closingCash: Int) {
@@ -13,7 +16,7 @@ const SHIFT_REPORT_PREVIEW = gql`
   }
 `;
 
-interface ShiftSummary {
+interface ShiftSummaryLocal {
   orders: {
     totalCount: number;
     totalAmount: number;
@@ -28,11 +31,13 @@ interface ShiftSummary {
 
 const router = useRouter();
 const sessionStore = useSessionStore();
+const offlineStore = useOfflineStore();
 
 const session = computed(() => sessionStore.currentSession);
-const summary = ref<ShiftSummary | null>(null);
+const summary = ref<ShiftSummaryLocal | null>(null);
 const loading = ref(false);
 const closing = ref(false);
+const isOnline = computed(() => offlineStore.isOnline);
 // 实交现金输入（元）
 const closingCashYuan = ref<number | null>(null);
 let refreshSeq = 0;
@@ -71,6 +76,8 @@ function methodLabel(method: string): string {
 
 async function loadSummary() {
   if (!session.value) return;
+  // 离线时无法调用后端对账单预览，跳过（保留上次本地快照或为空）
+  if (!isOnline.value) return;
   const mySeq = ++refreshSeq;
   loading.value = true;
   try {
@@ -84,7 +91,7 @@ async function loadSummary() {
     });
     if (mySeq !== refreshSeq) return;
     if (errors?.length && !data) throw new Error(errors[0].message);
-    summary.value = (data?.shiftReportPreview ?? null) as ShiftSummary | null;
+    summary.value = (data?.shiftReportPreview ?? null) as ShiftSummaryLocal | null;
   } catch (e) {
     if (mySeq !== refreshSeq) return;
     ElMessage.error('加载对账单失败：' + (e instanceof Error ? e.message : ''));
@@ -94,11 +101,64 @@ async function loadSummary() {
 }
 
 function handleClosingCashChange() {
+  if (!isOnline.value) return;
   // 防抖刷新对账单（传入 closingCash 触发现金对账 warnings）
   if (debounceTimer) clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     loadSummary();
   }, 400);
+}
+
+/** 离线关班：本地生成对账单 + 写 IndexedDB sessions 表 */
+async function handleOfflineClose() {
+  if (!session.value) return;
+  const sess = session.value;
+  const now = new Date().toISOString();
+
+  // 从本地 db.orders 构建最小对账单快照
+  const localOrders = sess.code
+    ? await db.orders.where('sessionCode').equals(sess.code).toArray()
+    : [];
+  const localSummary: ShiftSummary = {
+    orders: {
+      totalCount: localOrders.length,
+      totalAmount: localOrders.reduce((s, o) => s + o.totalAmount, 0),
+      normalCount: localOrders.filter((o) => o.orderType === 'sale').length,
+      refundCount: localOrders.filter((o) => o.orderType === 'refund').length,
+      refundAmount: localOrders
+        .filter((o) => o.orderType === 'refund')
+        .reduce((s, o) => s + o.totalAmount, 0),
+      heldCount: localOrders.filter((o) => o.orderType === 'hold').length,
+    },
+    paymentsByMethod: [],
+    warnings: ['离线关班，对账单为本地快照，联网同步后以服务端为准'],
+  };
+
+  const record: OfflineSessionRecord = {
+    code: sess.code,
+    idempotencyKey: genIdempotencyKey('session'),
+    clientCreatedAt: now,
+    clientUpdatedAt: now,
+    terminalCode: sess.terminal?.code ?? '',
+    operatorId: sess.operator?.id ? Number(sess.operator.id) : undefined,
+    state: 'closed',
+    openedAt: sess.openedAt ?? now,
+    closedAt: now,
+    openingFloat: sess.openingFloat ?? 0,
+    closingCash: closingCashCents.value ?? undefined,
+    localSummary,
+    syncStatus: 'pending',
+  };
+
+  try {
+    await db.sessions.put(record);
+    sessionStore.reset();
+    await offlineStore.updateCounts();
+    ElMessage.success('已离线保存，联网后自动同步');
+    router.replace('/setup');
+  } catch (e) {
+    ElMessage.error('离线关班失败：' + (e instanceof Error ? e.message : ''));
+  }
 }
 
 async function handleCloseSession() {
@@ -111,6 +171,10 @@ async function handleCloseSession() {
     });
   } catch {
     return; // 用户取消
+  }
+  if (!isOnline.value) {
+    await handleOfflineClose();
+    return;
   }
   closing.value = true;
   try {
@@ -136,7 +200,7 @@ function handleRefresh() {
 }
 
 onMounted(() => {
-  loadSummary();
+  if (isOnline.value) loadSummary();
 });
 
 watch(closingCashYuan, handleClosingCashChange);
@@ -144,11 +208,16 @@ watch(closingCashYuan, handleClosingCashChange);
 
 <template>
   <div class="shift-view">
-    <!-- 顶部：班次信息 -->
+    <!-- 顶部：班次信息 + 网络状态 -->
     <header class="top-bar">
       <el-button text @click="handleBackToCashier">← 返回收银台</el-button>
-      <span class="title">班次管理</span>
-      <el-button text @click="handleRefresh" :loading="loading">刷新</el-button>
+      <span class="title">
+        班次管理
+        <span class="net-badge" :class="isOnline ? 'online' : 'offline'">
+          {{ isOnline ? '● 在线' : '● 离线' }}
+        </span>
+      </span>
+      <el-button text @click="handleRefresh" :loading="loading" :disabled="!isOnline">刷新</el-button>
     </header>
 
     <main class="content" v-loading="loading">
@@ -189,6 +258,9 @@ watch(closingCashYuan, handleClosingCashChange);
       <!-- 对账单 -->
       <el-card class="report-card" shadow="never">
         <template #header><span class="card-title">对账单</span></template>
+        <div v-if="!isOnline" class="offline-banner">
+          离线模式：对账单预览不可用，关班后将本地保存，联网同步后以服务端对账为准
+        </div>
         <div v-if="summary">
           <!-- 订单统计 -->
           <div class="section">
@@ -286,7 +358,7 @@ watch(closingCashYuan, handleClosingCashChange);
             />
           </div>
         </div>
-        <div v-else-if="!loading" class="empty">暂无对账数据</div>
+        <div v-else-if="!loading && isOnline" class="empty">暂无对账数据</div>
       </el-card>
     </main>
 
@@ -325,6 +397,23 @@ watch(closingCashYuan, handleClosingCashChange);
   font-size: 16px;
   font-weight: 600;
   color: #303133;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.net-badge {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.net-badge.online {
+  color: #67c23a;
+  background: #f0f9eb;
+}
+.net-badge.offline {
+  color: #f56c6c;
+  background: #fef0f0;
 }
 .content {
   flex: 1;
@@ -365,6 +454,14 @@ watch(closingCashYuan, handleClosingCashChange);
 .info-item .sub {
   color: #909399;
   font-weight: 400;
+}
+.offline-banner {
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  background: #fdf6ec;
+  color: #e6a23c;
+  border-radius: 6px;
+  font-size: 13px;
 }
 .section {
   margin-bottom: 4px;

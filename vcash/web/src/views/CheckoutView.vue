@@ -5,7 +5,11 @@ import { ElMessage } from 'element-plus';
 import { gql } from '@apollo/client/core';
 import { apolloClient } from '@/api/client';
 import { useCartStore } from '@/stores/cart';
+import { useSessionStore } from '@/stores/session';
+import { useOfflineStore } from '@/stores/offline';
 import { formatMoney } from '@/utils/format';
+import { db, type OfflineOrderRecord } from '@/db/dexie';
+import { genIdempotencyKey } from '@/utils/idempotency';
 import PaymentMethodBar from '@/components/PaymentMethodBar.vue';
 import AggregatePayPanel from '@/components/AggregatePayPanel.vue';
 import type { PolledPayment } from '@/composables/useAggregatePayPolling';
@@ -59,13 +63,17 @@ interface Receipt {
   totalWithTax: number;
   lines: ReceiptLine[];
   payments: ReceiptPayment[];
+  offline: boolean;
 }
 
 const router = useRouter();
 const cart = useCartStore();
+const sessionStore = useSessionStore();
+const offlineStore = useOfflineStore();
 
 const total = computed(() => cart.totalWithTax);
 const isEmpty = computed(() => cart.isEmpty);
+const isOnline = computed(() => offlineStore.isOnline);
 
 type Stage = 'select' | 'aggregate' | 'success';
 const stage = ref<Stage>('select');
@@ -83,7 +91,7 @@ function methodLabel(method: string): string {
   }
 }
 
-function buildReceipt(order: any, payments: any[], stateOverride?: string): Receipt {
+function buildReceipt(order: any, payments: any[], stateOverride?: string, offline = false): Receipt {
   return {
     orderCode: order?.code || '',
     orderState: stateOverride ?? order?.state ?? '',
@@ -100,11 +108,69 @@ function buildReceipt(order: any, payments: any[], stateOverride?: string): Rece
       amount: p.amount ?? 0,
       state: p.state ?? '',
     })),
+    offline,
   };
+}
+
+/** 离线降级：写入 IndexedDB 队列 + 显示离线小票 */
+async function handleOfflineCash() {
+  if (checkingOut.value || isEmpty.value) return;
+  const order = cart.order;
+  if (!order) {
+    ElMessage.warning('购物车为空');
+    return;
+  }
+  const session = sessionStore.currentSession;
+  const now = new Date().toISOString();
+  const idempotencyKey = genIdempotencyKey('order');
+
+  const record: OfflineOrderRecord = {
+    idempotencyKey,
+    clientCreatedAt: now,
+    clientUpdatedAt: now,
+    sessionCode: session?.code ?? '',
+    terminalCode: session?.terminal?.code ?? '',
+    orderType: 'sale',
+    lines: cart.lines.map((l) => ({
+      productVariantId: l.productVariant.id,
+      quantity: l.quantity,
+      discount: l.customFields.discount || undefined,
+      isGift: l.customFields.isGift || undefined,
+      note: l.customFields.note ?? undefined,
+      originalPrice: l.customFields.originalPrice || undefined,
+    })),
+    payments: [{ method: 'cash' }],
+    totalAmount: cart.totalWithTax,
+    syncStatus: 'pending',
+  };
+
+  try {
+    await db.orders.put(record);
+    await db.payments.put({
+      idempotencyKey: genIdempotencyKey('payment'),
+      clientCreatedAt: now,
+      clientUpdatedAt: now,
+      orderKey: idempotencyKey,
+      method: 'cash',
+      amount: cart.totalWithTax,
+      syncStatus: 'pending',
+    });
+    receipt.value = buildReceipt(order, [{ method: 'cash', amount: cart.totalWithTax }], '离线已保存', true);
+    cart.clear();
+    stage.value = 'success';
+    ElMessage.success('已离线保存，联网后自动同步');
+    await offlineStore.updateCounts();
+  } catch (e) {
+    ElMessage.error('离线保存失败：' + (e instanceof Error ? e.message : ''));
+  }
 }
 
 async function handleCash() {
   if (checkingOut.value || isEmpty.value) return;
+  if (!isOnline.value) {
+    await handleOfflineCash();
+    return;
+  }
   checkingOut.value = true;
   try {
     const { data, errors } = await apolloClient.mutate({
@@ -126,6 +192,10 @@ async function handleCash() {
 
 function handleAggregate() {
   if (isEmpty.value) return;
+  if (!isOnline.value) {
+    ElMessage.warning('离线模式不支持聚合支付，请使用现金');
+    return;
+  }
   stage.value = 'aggregate';
 }
 
@@ -154,11 +224,13 @@ function handleBackToCashier() {
 
 <template>
   <div class="checkout-view">
-    <!-- 顶部：返回收银台 -->
+    <!-- 顶部：返回收银台 + 网络状态 -->
     <header class="top-bar">
       <el-button text @click="handleBackToCashier">← 返回收银台</el-button>
       <span class="title">结账</span>
-      <span class="placeholder"></span>
+      <span class="net-badge" :class="isOnline ? 'online' : 'offline'">
+        {{ isOnline ? '● 在线' : '● 离线' }}
+      </span>
     </header>
 
     <main class="content">
@@ -172,6 +244,9 @@ function handleBackToCashier() {
           <PaymentMethodBar @cash="handleCash" @aggregate="handleAggregate" />
         </div>
         <div class="hint" v-if="isEmpty">购物车为空，请先返回收银台添加商品</div>
+        <div class="hint offline-hint" v-else-if="!isOnline">
+          离线模式：现金结账将本地保存，联网后自动同步
+        </div>
       </template>
 
       <!-- 阶段二：聚合码支付 -->
@@ -189,12 +264,16 @@ function handleBackToCashier() {
       <!-- 阶段三：支付成功 + 小票预览 -->
       <template v-else>
         <div class="success-section">
-          <div class="success-icon">✓</div>
-          <h2>支付成功</h2>
+          <div class="success-icon" :class="{ offline: receipt?.offline }">
+            {{ receipt?.offline ? '⇩' : '✓' }}
+          </div>
+          <h2>{{ receipt?.offline ? '已离线保存' : '支付成功' }}</h2>
+          <div class="offline-tip" v-if="receipt?.offline">联网后自动同步到服务器</div>
         </div>
         <div class="receipt" v-if="receipt">
           <div class="receipt-header">
-            <span>订单号：{{ receipt.orderCode || '-' }}</span>
+            <span>订单号：{{ receipt.orderCode || (receipt.offline ? '离线订单' : '-') }}</span>
+            <el-tag v-if="receipt.offline" type="warning" size="small">离线</el-tag>
           </div>
           <div class="receipt-lines">
             <div v-for="(line, idx) in receipt.lines" :key="idx" class="receipt-line">
@@ -251,8 +330,19 @@ function handleBackToCashier() {
   font-weight: 600;
   color: #303133;
 }
-.placeholder {
-  width: 80px;
+.net-badge {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.net-badge.online {
+  color: #67c23a;
+  background: #f0f9eb;
+}
+.net-badge.offline {
+  color: #f56c6c;
+  background: #fef0f0;
 }
 .content {
   flex: 1;
@@ -284,6 +374,9 @@ function handleBackToCashier() {
   color: #909399;
   font-size: 13px;
 }
+.offline-hint {
+  color: #e6a23c;
+}
 .success-section {
   display: flex;
   flex-direction: column;
@@ -301,9 +394,16 @@ function handleBackToCashier() {
   align-items: center;
   justify-content: center;
 }
+.success-icon.offline {
+  background: #e6a23c;
+}
 .success-section h2 {
   margin: 0;
   color: #303133;
+}
+.offline-tip {
+  font-size: 13px;
+  color: #909399;
 }
 .receipt {
   width: 100%;
@@ -314,6 +414,9 @@ function handleBackToCashier() {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 .receipt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 13px;
   color: #909399;
   margin-bottom: 12px;
