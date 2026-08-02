@@ -189,7 +189,7 @@ const adminSchema = gql`
     AggregatePayService,
     RefundService,
   ],
-  exports: [PosOrderService],
+  exports: [PosOrderService, PosSessionService],
   adminApiExtensions: {
     resolvers: [AdminTerminalResolver, AdminPosResolver, AdminRefundResolver],
     schema: adminSchema,
