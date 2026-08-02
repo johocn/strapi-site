@@ -5,6 +5,7 @@ import {
   Order,
   OrderService,
   RequestContext,
+  StockMovementService,
   TransactionalConnection,
   UserInputError,
   idsAreEqual,
@@ -50,6 +51,7 @@ export class PosOrderService {
     @InjectConnection() private connection: Connection,
     @Inject(TransactionalConnection) private transactionalConnection: TransactionalConnection,
     @Inject(OrderService) private orderService: OrderService,
+    @Inject(StockMovementService) private stockMovementService: StockMovementService,
   ) {}
 
   /**
@@ -185,7 +187,7 @@ export class PosOrderService {
       }
 
       // 3. 收集 Payment 快照并校验 order 已到 PaymentSettled
-      const finalOrder = await this.orderService.findOne(txCtx, order.id, ['payments']);
+      const finalOrder = await this.orderService.findOne(txCtx, order.id, ['payments', 'lines']);
       if (finalOrder) {
         settledPayments.push(...(finalOrder.payments ?? []));
         if (finalOrder.state !== 'PaymentSettled') {
@@ -193,6 +195,14 @@ export class PosOrderService {
             `结账未完成：订单状态为 ${finalOrder.state}，预期 PaymentSettled（支付金额可能不足）`,
           );
         }
+        // 4. POS 无 Fulfillment 步骤，手动触发 SALE 扣减（stockOnHand--, stockAllocated--）
+        //    Vendure 默认在 ArrangingPayment→PaymentSettled 时已执行 ALLOCATE（分配），
+        //    但 SALE（实际扣减）只在 Fulfillment Shipped 时触发。POS 场景需手动补上。
+        const orderLines = finalOrder.lines.map(line => ({
+          orderLineId: line.id,
+          quantity: line.quantity,
+        }));
+        await this.stockMovementService.createSalesForOrder(txCtx, orderLines);
       }
     });
 
@@ -273,7 +283,17 @@ export class PosOrderService {
       }
     });
 
-    // 4. 返回最终 Order
+    // 4. 手动触发 SALE 扣减（与 checkoutPosOrder 同理，POS 无 Fulfillment）
+    const settledOrder = await this.orderService.findOne(ctx, newOrder.id, ['payments', 'lines']);
+    if (settledOrder && settledOrder.state === 'PaymentSettled') {
+      const orderLines = settledOrder.lines.map(line => ({
+        orderLineId: line.id,
+        quantity: line.quantity,
+      }));
+      await this.stockMovementService.createSalesForOrder(ctx, orderLines);
+    }
+
+    // 5. 返回最终 Order
     const finalOrder = await this.orderService.findOne(ctx, newOrder.id, ['payments']);
     return finalOrder as Order;
   }
