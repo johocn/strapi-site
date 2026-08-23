@@ -102,6 +102,22 @@ moduleGranted(activity)= featureFlags.activity !== false && moduleGranted(points
 - **前端（web 运营端）**：`tenant/detail.vue` 按当前用户 `zhaoRoles` 判定——上述三区域仅 `admin` 可见可编辑；非 admin 隐藏或只读展示，不上送修改。
 - **后端（强约束）**：租户设置写入接口对 `featureFlags / website / studio` 相关字段做角色校验，非 `admin` 拒绝写入（沿用 `has-permission` 的 admin 放行逻辑）；前端隐藏仅作体验优化，不构成安全边界。
 
+### 4.5 企业全局配置页：模块授权入口（moduleGranted 授权门控）
+
+**来源定位**：已有页面 `e:\code\web\src\pages\global-config\index.vue`（路由 `pages/global-config/index`），dashboard「多租户管理」区"/租户权限"项进入，仅 `admin` 可见。
+
+- 该页管理 **`moduleEnabled`(全局开关)** + **`moduleTenantGrants`(按租户授权)**。
+- 后端 `getPublicConfig` 派生：`moduleGrantedForCurrentTenant[key] = moduleEnabled[key] || moduleTenantGrants[key].includes(当前租户)`。
+- 这是 admin 给租户**授权模块**的统一入口：课程/活动/考试、企业官网/媒体发布 等模块若「全局关闭且未按租户授权」→ 该租户 `moduleGranted=false` → web 菜单与 C端入口均不可用。
+
+**本设计对该页的补充：**
+- 页面 `MODULE_LIST`/`DEFAULT_MODULE_ENABLED` 需补齐 `exam`、`activity`（顺带确保 `wealth`），使其可被 admin 授权。
+- 授权门控应用到两端：
+  - web：`isModuleVisible` 层 2 已用 `moduleGrantedForCurrentTenant`。
+  - shao(C端)：对 课程/活动/考试 需读取 `moduleGrantedForCurrentTenant` 联合 `featureFlags` 判断入口可见性。
+
+**两级授权关系（admin 统一由角色门控）：** `企业全局配置(moduleGranted授权)` 决定模块"是否授权该租户可用"；`租户详情的功能开关(featureFlags)` 决定"授权后是否开启"；C端/web 需两者同时满足才可用。
+
 ---
 
 ## 5. 错误处理与兜底
