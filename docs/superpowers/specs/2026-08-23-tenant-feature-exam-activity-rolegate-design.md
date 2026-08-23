@@ -89,6 +89,19 @@ moduleGranted(activity)= featureFlags.activity !== false && moduleGranted(points
 - 考试入口 / 线下活动入口按 `exam` / `activity` 显隐。
 - 课程 / 活动 / 考试列表按 `roleGate` + `visibleToRoles` 过滤（由后端返回过滤后的数据）。
 
+### 4.4 设置权限边界：功能开关 / 企业官网 / 多媒体发布中心 仅 admin 可配置
+
+**三类租户设置仅平台超管 `admin`（zhao-auth 角色）可对租户设置，其他角色（channel-admin / plugin-manager / instructor / user）无权限：**
+
+| 设置区域 | 可配置角色 |
+|---|---|
+| 功能开关（featureFlags，含本设计新增的 exam/activity/roleGate） | 仅 `admin` |
+| 企业官网（website 相关配置） | 仅 `admin` |
+| 多媒体发布中心（studio 相关配置） | 仅 `admin` |
+
+- **前端（web 运营端）**：`tenant/detail.vue` 按当前用户 `zhaoRoles` 判定——上述三区域仅 `admin` 可见可编辑；非 admin 隐藏或只读展示，不上送修改。
+- **后端（强约束）**：租户设置写入接口对 `featureFlags / website / studio` 相关字段做角色校验，非 `admin` 拒绝写入（沿用 `has-permission` 的 admin 放行逻辑）；前端隐藏仅作体验优化，不构成安全边界。
+
 ---
 
 ## 5. 错误处理与兜底
