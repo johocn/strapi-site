@@ -5,6 +5,32 @@ let cachedConfig = null
 let lastUnavailableNotify = 0
 const UNAVAILABLE_NOTIFY_INTERVAL = 30 * 1000
 
+// 模块可见性 key 列表（与后端 schema 保持一致）
+const VISIBILITY_MODULES = [
+  'website', 'logistics', 'studio', 'points', 'course', 'quiz',
+  'channel', 'sso', 'thirdParty', 'oss', 'payment', 'community', 'forum', 'wealth'
+]
+
+// 默认模块可见性配置（每个模块对哪些角色可见）
+const DEFAULT_MODULE_VISIBILITY = {
+  website: ['channel-admin', 'plugin-manager', 'instructor', 'website-manager', 'website-editor', 'marketing-manager', 'marketing-editor', 'tag-manager', 'tag-editor'],
+  logistics: ['channel-admin', 'plugin-manager', 'instructor', 'logistics-manager', 'logistics-editor'],
+  studio: ['channel-admin', 'plugin-manager', 'instructor', 'studio-manager', 'studio-editor', 'marketing-manager', 'marketing-editor'],
+  points: ['channel-admin', 'plugin-manager', 'instructor', 'point-manager', 'point-editor', 'wealth-manager', 'wealth-editor'],
+  course: ['channel-admin', 'plugin-manager', 'instructor', 'course-manager', 'course-editor', 'study-manager', 'study-editor', 'tag-manager', 'tag-editor'],
+  quiz: ['channel-admin', 'plugin-manager', 'instructor', 'quiz-manager', 'quiz-editor', 'course-manager', 'course-editor', 'tag-manager', 'tag-editor'],
+  channel: ['channel-admin', 'plugin-manager', 'marketing-manager', 'marketing-editor'],
+  sso: ['plugin-manager', 'system-manager', 'system-editor'],
+  thirdParty: ['plugin-manager', 'system-manager', 'system-editor'],
+  oss: ['plugin-manager', 'system-manager', 'system-editor'],
+  payment: ['plugin-manager', 'wealth-manager', 'wealth-editor', 'system-manager', 'system-editor'],
+  community: ['channel-admin', 'plugin-manager', 'instructor', 'marketing-manager', 'marketing-editor'],
+  forum: ['channel-admin', 'plugin-manager', 'instructor', 'marketing-manager', 'marketing-editor'],
+  wealth: ['channel-admin', 'plugin-manager', 'instructor', 'wealth-manager', 'wealth-editor'],
+  exam: ['channel-admin', 'plugin-manager', 'instructor', 'quiz-manager', 'quiz-editor', 'course-manager', 'course-editor', 'tag-manager', 'tag-editor'],
+  activity: ['channel-admin', 'plugin-manager', 'instructor', 'point-manager', 'point-editor'],
+}
+
 function notifyServiceUnavailable() {
   const now = Date.now()
   if (now - lastUnavailableNotify < UNAVAILABLE_NOTIFY_INTERVAL) return
@@ -70,6 +96,10 @@ export function getDefaultConfig() {
       website: true,
       logistics: true,
       studio: true,
+      wealth: false,
+      exam: true,
+      activity: true,
+      roleGate: false,
       // 细粒度默认值
       pointsEnabled: true,
       coursePreviewEnabled: true,
@@ -106,6 +136,21 @@ export function getDefaultConfig() {
       tabBarColor: '#667eea',
       tabBarActiveColor: '#ffffff',
     },
+    moduleEnabled: {
+      website: false, logistics: false, studio: false,
+      points: true, course: true, quiz: true, channel: true,
+      sso: false, thirdParty: false, oss: false,
+      payment: false, community: false, forum: false,
+      wealth: false, exam: true, activity: true,
+    },
+    moduleGrantedForCurrentTenant: {
+      website: false, logistics: false, studio: false,
+      points: true, course: true, quiz: true, channel: true,
+      sso: false, thirdParty: false, oss: false,
+      payment: false, community: false, forum: false,
+      wealth: false, exam: true, activity: true,
+    },
+    moduleVisibility: DEFAULT_MODULE_VISIBILITY,
   }
 }
 
@@ -140,4 +185,38 @@ export function clearConfigCache() {
 
 export function getConfigValue(key, defaultValue = null) {
   return cachedConfig?.[key] ?? defaultValue
+}
+
+/**
+ * 模块可见性判定（三层校验）
+ *
+ * 层 1：admin 角色 → 永远可见
+ * 层 2：当前租户授权检查（读后端预计算的 moduleGrantedForCurrentTenant 布尔映射）
+ * 层 3：租户级角色可见性（moduleVisibility）
+ *
+ * @param {string} moduleKey - 模块 key
+ * @param {string[]} userRoles - 当前用户角色数组
+ * @param {string} currentTenantDocId - 当前租户 documentId（保留参数兼容，实际未使用）
+ * @returns {boolean}
+ */
+export function isModuleVisible(moduleKey, userRoles = [], currentTenantDocId = '') {
+  // 层 1：admin 永远可见
+  if (userRoles.includes('admin')) return true
+
+  // 层 2：当前租户授权检查（后端预计算的布尔值）
+  const isGranted = cachedConfig?.moduleGrantedForCurrentTenant?.[moduleKey] ?? false
+  if (!isGranted) return false
+
+  // 层 3：租户级角色可见性
+  const visibility = cachedConfig?.moduleVisibility ?? DEFAULT_MODULE_VISIBILITY
+  const allowedRoles = visibility[moduleKey] ?? DEFAULT_MODULE_VISIBILITY[moduleKey] ?? []
+  if (userRoles.length === 0 || userRoles.every(r => r === 'user')) return false
+  return userRoles.some(role => allowedRoles.includes(role))
+}
+
+/**
+ * 判断某模块是否被全局授权给当前租户（前端 UI 灰显用）
+ */
+export function isModuleGloballyGranted(moduleKey, currentTenantDocId = '') {
+  return cachedConfig?.moduleGrantedForCurrentTenant?.[moduleKey] ?? false
 }
