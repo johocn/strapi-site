@@ -43,6 +43,34 @@
         </view>
       </view>
 
+      <!-- 宣传文案：完全定制优先，否则回退运营端 promoModules 模块组合 -->
+      <view v-if="customPromoHtml" class="promo-page promo-section" :class="promoClass" :style="colorVars">
+        <PromoCustomPage :activity="activity" />
+      </view>
+      <view v-else-if="modules.length" class="promo-page promo-section" :class="promoClass" :style="colorVars">
+        <block v-for="m in modules" :key="m.sort">
+          <PromoCover v-if="m.type === 'cover'" :activity="activity" :config="m.config" />
+          <PromoInfo v-else-if="m.type === 'info'" :activity="activity" :config="m.config" />
+          <PromoRich v-else-if="m.type === 'rich'" :activity="activity" :config="m.config" />
+          <PromoHighlights v-else-if="m.type === 'highlights'" :activity="activity" :config="m.config" />
+          <PromoSpeakers v-else-if="m.type === 'speakers'" :activity="activity" :config="m.config" />
+          <PromoAgenda v-else-if="m.type === 'agenda'" :activity="activity" :config="m.config" />
+          <PromoImages v-else-if="m.type === 'images'" :activity="activity" :config="m.config" />
+          <PromoFaq v-else-if="m.type === 'faq'" :activity="activity" :config="m.config" />
+          <PromoCustom v-else-if="m.type === 'custom'" :activity="activity" :config="m.config" />
+          <PromoRewards v-else-if="m.type === 'rewards'" :rewards="activity.rewardConfig" />
+          <PromoContact
+            v-else-if="m.type === 'contact'"
+            :contact="activity.promoContact"
+            @open-wechat="onPromoContact('wechat')"
+            @call-phone="onPromoContact('phone')"
+            @open-card="onPromoContact('card')"
+            @open-message="onPromoContact('message')"
+          />
+          <PromoMessage v-else-if="m.type === 'message'" :messages="[]" @open-message="onPromoContact('message')" />
+        </block>
+      </view>
+
       <!-- 回放与资料（活动结束后的沉淀内容） -->
       <view v-if="hasAssets" class="card assets-card">
         <text class="assets-title">回放与资料</text>
@@ -142,16 +170,13 @@
       </view>
 
       <view v-if="signedUp" class="action-bar">
-        <view v-if="canSelf" class="action-btn primary" @click="onCheckin">
+        <view v-if="canSignin" class="action-btn primary" @click="onCheckin">
           <text>到场签到</text>
         </view>
         <view v-if="canCancel" class="action-btn ghost" @click="onCancel">
           <text>取消报名</text>
         </view>
-        <view v-if="activity.status === 'ended' && !canSelf" class="action-btn primary" @click="openReview">
-          <text>{{ reviewed ? '已评价' : '去评价' }}</text>
-        </view>
-        <view v-if="activity.status === 'ended' && canSelf" class="action-btn ghost" @click="openReview">
+        <view v-if="activity.status === 'ended'" :class="['action-btn', reviewBtnClass]" @click="openReview">
           <text>{{ reviewed ? '已评价' : '去评价' }}</text>
         </view>
       </view>
@@ -201,29 +226,34 @@
       </view>
     </view>
 
-    <!-- 报名奖励引导弹层（微信环境 + 配置 rewardConfig） -->
+    <!-- 报名奖励引导弹层（微信环境必走：对比法登录 + 分级积分 + 关注引导） -->
     <view class="signup-mask" v-if="showGuide">
       <view class="signup-panel guide-panel" @click.stop>
         <text class="signup-title">报名奖励</text>
 
-        <!-- Step1 登录方式 -->
+        <!-- Step1 登录方式（对比法：授权突出，静默弱化） -->
         <template v-if="guideStep === 'login'">
-          <text class="guide-tip">微信授权登录可解锁更多权益：模板消息通知报名进度 + 获得积分、专属福利。</text>
+          <text class="guide-tip">微信授权登录可解锁更多权益：模板消息通知报名进度 + 更高积分、专属福利。</text>
           <view class="guide-row">
-            <view class="guide-opt" @click="chooseSilentLogin">
-              <text class="guide-opt-title">静默登录</text>
-              <text class="guide-opt-desc">直接报名，无额外权益</text>
-            </view>
-            <view class="guide-opt primary" @click="chooseAuthLogin">
+            <view class="guide-opt primary highlight" @click="chooseAuthLogin">
               <text class="guide-opt-title">微信授权登录</text>
-              <text class="guide-opt-desc">模板通知 · 积分 · 更多福利</text>
+              <text class="guide-opt-desc">积分 +10 · 模板通知报名进度/候补转正</text>
+              <view class="guide-benefits">
+                <text class="guide-benefit">✓ 关注公众号自动同步</text>
+                <text class="guide-benefit">✓ 头像昵称一键同步</text>
+              </view>
+              <view class="guide-btn auth">微信授权登录</view>
+            </view>
+            <view class="guide-opt muted" @click="chooseSilentLogin">
+              <text class="guide-opt-title muted-title">静默登录</text>
+              <text class="guide-opt-desc">直接报名，基础 5 积分</text>
             </view>
           </view>
         </template>
 
-        <!-- Step2 信息解锁 -->
+        <!-- Step2 信息完善（联系方式+20 / 问卷+50，选填） -->
         <template v-else-if="guideStep === 'info'">
-          <text class="guide-tip">完善以下信息，可解锁对应奖励（选填，不强制）</text>
+          <text class="guide-tip">完善以下信息可获额外积分（选填）：联系方式 +20 · 问卷 +50</text>
           <view v-for="f in formFields" :key="f.key" class="signup-field">
             <text class="signup-label">{{ f.label }}</text>
             <input v-if="f.type === 'text' || f.type === 'phone'" class="signup-input"
@@ -244,13 +274,31 @@
             </view>
             <input v-else-if="f.type === 'number'" class="signup-input" type="number" v-model="signupData[f.key]" />
           </view>
+          <view v-if="questionnaireFields.length" class="survey-entry" @click="openFillQuestionnaire">
+            <text class="survey-entry-text">填写问卷（+50 积分）</text>
+            <text class="survey-entry-arrow">›</text>
+          </view>
           <view class="guide-actions">
             <view class="signup-btn cancel" @click="showGuide = false"><text>取消</text></view>
             <view class="signup-btn submit" @click="continueInfo"><text>下一步</text></view>
           </view>
         </template>
 
-        <!-- Step3 奖励菜单 -->
+        <!-- Step3 关注公众号（+50 积分） -->
+        <template v-else-if="guideStep === 'follow'">
+          <text class="guide-tip">关注公众号额外获得 50 积分，并可接收活动提醒</text>
+          <view class="qrcode-container">
+            <image v-if="wxQrcodeUrl" :src="wxQrcodeUrl" class="qrcode-img" mode="aspectFit" />
+            <text v-else class="qrcode-placeholder">公众号二维码加载中...</text>
+          </view>
+          <text class="qrcode-hint">长按识别二维码关注公众号</text>
+          <view class="guide-actions">
+            <view class="signup-btn cancel" @click="showGuide = false"><text>跳过</text></view>
+            <view class="signup-btn submit" @click="refreshSubscribeStatus"><text>我已关注，刷新</text></view>
+          </view>
+        </template>
+
+        <!-- Step4 奖励菜单（有 rewardConfig 才展示） -->
         <template v-else-if="guideStep === 'reward'">
           <text class="guide-tip">以下奖励已解锁{{ multiRewards.length ? '，可多选' : '' }}</text>
           <view v-for="r in unlockedRewards" :key="r.id" class="signup-field reward-item"
@@ -267,9 +315,15 @@
           </view>
         </template>
 
-        <!-- Step4 确认报名 -->
+        <!-- Step5 确认报名（积分明细 + 权益） -->
         <template v-else-if="guideStep === 'confirm'">
-          <text class="guide-tip">确认报名后，系统将自动发放以下奖励：</text>
+          <text class="guide-tip">确认报名后，将获得以下积分：</text>
+          <view class="points-preview">
+            <view v-for="item in pointsPreviewList" :key="item.key" class="points-item">
+              <text class="points-item-name">{{ item.name }}</text>
+              <text class="points-item-val">+{{ item.points }}</text>
+            </view>
+          </view>
           <view v-for="g in unwrapGrantedPreview" :key="g.id" class="signup-field reward-item">
             <text class="reward-name">{{ g.name }}</text>
           </view>
@@ -354,6 +408,7 @@ import {
   signupActivity,
   fillQuestionnaire,
   unlockCheck,
+  getActivityFollowQrcode,
   cancelActivity,
   checkinActivity,
   myActivities,
@@ -366,10 +421,26 @@ import {
   listActivities,
 } from '../../services/api'
 import { getToken, getUser } from '../../utils/storage'
-import { isWechatBrowser } from '../../utils/env'
+import { isWechatBrowser, resolveMediaUrl } from '../../utils/env'
+import { setupPageShare } from '../../utils/share'
 import { redirectToWechatAuth } from '../../utils/wx-h5-login'
 import UQRCode from 'uqrcodejs'
 import SharePoster from '../../components/share-poster/share-poster.vue'
+
+// 宣传模块（复用 promo 组件，渲染运营端保存的 promoModules）
+import PromoCover from '../../components/promo/promo-cover.vue'
+import PromoInfo from '../../components/promo/promo-info.vue'
+import PromoRich from '../../components/promo/promo-rich.vue'
+import PromoHighlights from '../../components/promo/promo-highlights.vue'
+import PromoSpeakers from '../../components/promo/promo-speakers.vue'
+import PromoAgenda from '../../components/promo/promo-agenda.vue'
+import PromoImages from '../../components/promo/promo-images.vue'
+import PromoFaq from '../../components/promo/promo-faq.vue'
+import PromoCustom from '../../components/promo/promo-custom.vue'
+import PromoRewards from '../../components/promo/promo-rewards.vue'
+import PromoContact from '../../components/promo/promo-contact.vue'
+import PromoMessage from '../../components/promo/promo-message.vue'
+import PromoCustomPage from '../../components/promo/promo-custom-page.vue'
 
 // 报名引导存储键：activityId → { loginAuth }，用于微信授权跳转回调后恢复引导进度
 const REWARD_GUIDE_KEY = 'actRewardGuide'
@@ -387,7 +458,11 @@ const fee = ref<{ mode: string; cost: number; feeCollectAt: string; name: string
 const signedUp = ref(false)
 const waitlisted = ref(false)
 const waitlistPosition = ref(0)
-const isFull = computed(() => (activity.value?.usedCapacity ?? 0) >= (activity.value?.capacity ?? 0))
+// 满员判定：仅当设置了名额（capacity>0）才参与比较，避免不限名额活动误显示「立即候补」
+const isFull = computed(() => {
+  const cap = Number(activity.value?.capacity) || 0
+  return cap > 0 && (activity.value?.usedCapacity ?? 0) >= cap
+})
 const qrcodeUrl = ref('')
 const showSharePoster = ref(false)
 const showReview = ref(false)
@@ -404,7 +479,7 @@ const signupData = ref<Record<string, any>>({})
 
 // ===== 报名奖励引导 =====
 const showGuide = ref(false)
-const guideStep = ref<'login' | 'info' | 'reward' | 'confirm' | ''>('')
+const guideStep = ref<'login' | 'info' | 'follow' | 'reward' | 'confirm' | ''>('')
 const loginAuth = ref(false)
 const chosenRewards = ref<string[]>([])
 const grantMessages = ref<{ message: string; link?: string }[]>([])
@@ -415,6 +490,9 @@ const unlockStatus = ref<any>(null)
 const signupId = ref<number | null>(null)
 const showFillQuestionnaire = ref(false)
 const showQuestionnaire = ref(false)
+// 公众号关注二维码（微信环境报名引导 Step3；未配置公众号时 followEnabled=false 跳过）
+const wxQrcodeUrl = ref('')
+const followEnabled = ref(false)
 
 const rewardCfg = computed(() => {
   const rc = activity.value?.rewardConfig
@@ -483,13 +561,45 @@ const unlockedRewards = computed(() => {
 
 const multiRewards = computed(() => unlockedRewards.value.filter((r: any) => r.mode === 'multi'))
 
-/** 进入引导：仅微信环境且该活动配置了 rewardConfig；先探测解锁状态再定步进 */
+// 分级积分预览：单一来源取后端 unlockCheck.pointsPreview；接口异常降级固定兜底值
+const FALLBACK_POINTS = { base: 5, auth: 5, contact: 20, survey: 50, subscribe: 50 }
+const pointsPreview = computed(() => {
+  const p = unlockStatus.value?.pointsPreview
+  if (p && typeof p === 'object' && typeof p.total === 'number') return p
+  return { ...FALLBACK_POINTS, total: Object.values(FALLBACK_POINTS).reduce((a: number, b: number) => a + b, 0) }
+})
+const pointsPreviewList = computed(() => {
+  const p = pointsPreview.value
+  const items = [
+    { key: 'base', name: '报名基础积分', points: p.base },
+    { key: 'auth', name: '微信授权登录', points: p.auth },
+    { key: 'contact', name: '完善联系方式', points: p.contact },
+    { key: 'survey', name: '回答问卷', points: p.survey },
+    { key: 'subscribe', name: '关注公众号', points: p.subscribe },
+  ]
+  return items.filter(i => Number(i.points) > 0)
+})
+
+// 信息步：有报名表单(电话)或问卷且对应项未填才需要
+const hasPhoneField = computed(() => formFields.value.some((f: any) => f?.type === 'phone' && f?.key))
+const needsInfo = computed(() => {
+  const contactNeeded = hasPhoneField.value && !channelFilledValue('contact')
+  const surveyNeeded = questionnaireFields.value.length > 0 && !surveyFilledValue()
+  return contactNeeded || surveyNeeded
+})
+
+// 关注步：未关注且二维码可用才展示
+const showFollowStep = computed(() => !subscribed.value && followEnabled.value)
+
+/** 进入引导：微信环境无条件触发（不再依赖 rewardConfig）；先探测解锁状态再定步进 */
 async function openRewardGuide() {
   loginAuth.value = false
   subscribed.value = false
   chosenRewards.value = []
   grantMessages.value = []
   unlockStatus.value = null
+  wxQrcodeUrl.value = ''
+  followEnabled.value = false
   showGuide.value = true
   // 若存在引导进度（微信授权回调后恢复），则已选授权登录
   const pending = uni.getStorageSync(REWARD_GUIDE_KEY) as any
@@ -498,6 +608,7 @@ async function openRewardGuide() {
     uni.removeStorageSync(REWARD_GUIDE_KEY)
   }
   await refreshUnlockStatus()
+  if (!subscribed.value) await loadFollowQrcode()
   guideStep.value = resolveGuideStep()
 }
 
@@ -513,17 +624,35 @@ async function refreshUnlockStatus() {
   }
 }
 
-/** 按通道与达成情况决定引导步进 */
-function resolveGuideStep(): string {
-  if (channelType.value === 'wechat_auth' && !loginAuth.value) return 'login'
-  if (!channelDone.value) return 'info'
-  return 'reward'
+/** 加载公众号关注二维码（失败/未配置 → followEnabled=false，跳过关注步不阻塞报名） */
+async function loadFollowQrcode() {
+  try {
+    const res = await getActivityFollowQrcode(id)
+    const url = (res as any)?.wx_url || (res as any)?.data?.wx_url || ''
+    wxQrcodeUrl.value = url
+    followEnabled.value = !!url
+  } catch (e) {
+    wxQrcodeUrl.value = ''
+    followEnabled.value = false
+  }
 }
 
-/** 静默/跳过：不完成通道直接报名（未过通道门槛则无可领权益） */
+/** 线性向导下一步：login → info → follow → reward(有权益才展示) → confirm */
+function resolveNextStep(): string {
+  if (needsInfo.value) return 'info'
+  if (showFollowStep.value) return 'follow'
+  if (unlockedRewards.value.length) return 'reward'
+  return 'confirm'
+}
+function resolveGuideStep(): string {
+  if (!loginAuth.value) return 'login'
+  return resolveNextStep()
+}
+
+/** 静默/跳过登录：跳过登录对比步，继续后续 info/follow/reward */
 function chooseSilentLogin() {
   loginAuth.value = false
-  guideStep.value = 'reward'
+  guideStep.value = resolveNextStep()
 }
 
 function chooseAuthLogin() {
@@ -534,16 +663,20 @@ function chooseAuthLogin() {
   })
 }
 
-/** 信息步进完成：重新评估通道是否达成 */
+/** 信息步进完成：重新评估下一步（可能仍需 info） */
 function continueInfo() {
-  guideStep.value = channelDone.value ? 'reward' : 'info'
+  guideStep.value = resolveNextStep()
 }
 
-/** 关注公众号通道：重测订阅状态（微信事件回调已写库，刷新即可） */
+/** 关注公众号通道：重测订阅状态（微信事件回调已写库，刷新即可）；已关注则发关注积分并推进 */
 async function refreshSubscribeStatus() {
   await refreshUnlockStatus()
-  if (subscribed.value) guideStep.value = 'reward'
-  else uni.showToast({ title: '暂未检测到关注，请关注后再试', icon: 'none' })
+  if (subscribed.value) {
+    guideStep.value = resolveNextStep()
+    uni.showToast({ title: '已关注，+50积分', icon: 'none' })
+  } else {
+    uni.showToast({ title: '暂未检测到关注，请关注后再试', icon: 'none' })
+  }
 }
 
 /** 勾选/取消多选奖励（单选自动领取，不可取消；按 selectMode 约束） */
@@ -647,12 +780,73 @@ const canSelf = computed(() => {
   return m === 'self' || m === 'both'
 })
 
+// 签到仅在进行中/报名开放时可用（活动结束后不显示到场签到）
+const canSignin = computed(() => {
+  if (!canSelf.value) return false
+  const s = activity.value?.status
+  return s === 'signup_open' || s === 'ongoing'
+})
+// 评价按钮样式：已支持自助签到用 ghost，否则 primary
+const reviewBtnClass = computed(() => (canSelf.value ? 'ghost' : 'primary'))
+
 const canCancel = computed(() => {
   const s = activity.value?.status
   return s === 'signup_open' || s === 'ongoing'
 })
 
 const usedCapacity = computed(() => activity.value?.usedCapacity ?? 0)
+
+// ===== 宣传模块渲染 =====
+const PROMO_TYPE_SET = new Set([
+  'cover', 'info', 'rich', 'highlights', 'speakers', 'agenda', 'images', 'faq', 'custom',
+  'rewards', 'contact', 'message',
+])
+const modules = computed(() =>
+  (Array.isArray(activity.value?.promoModules) ? activity.value.promoModules : [])
+    .filter((m: any) => m && PROMO_TYPE_SET.has(m.type))
+    .sort((a: any, b: any) => Number(a.sort || 0) - Number(b.sort || 0))
+)
+const customPromoHtml = computed(() => {
+  const v = activity.value?.customPromoHtml
+  return v && String(v).trim() ? String(v) : ''
+})
+const promoClass = computed(() => `promo-${activity.value?.promoTemplate || 'summit'}`)
+// 运营端可配置 promoColors，内联 CSS 变量覆盖模板默认配色（--c-*）
+const colorVars = computed(() => {
+  const c = activity.value?.promoColors
+  if (!c || typeof c !== 'object') return null
+  const vars: Record<string, string> = {}
+  if (c.primary) vars['--c-primary'] = c.primary
+  if (c.accent) vars['--c-accent'] = c.accent
+  if (c.bg) vars['--c-bg'] = c.bg
+  if (c.card) vars['--c-card'] = c.card
+  if (c.text) vars['--c-text'] = c.text
+  if (c.textDim) vars['--c-text-dim'] = c.textDim
+  return vars
+})
+
+/** 联系方式/留言模块交互：wechat=复制微信号 / phone=拨打电话 / card=名片 / message=在线留言 */
+function onPromoContact(type: 'wechat' | 'phone' | 'card' | 'message') {
+  const c = activity.value?.promoContact || {}
+  if (type === 'phone') {
+    const phone = c.phone
+    if (phone) uni.makePhoneCall({ phoneNumber: String(phone) })
+    else uni.showToast({ title: '暂无联系电话', icon: 'none' })
+  } else if (type === 'wechat') {
+    const wechat = c.wechat?.id
+    if (wechat) {
+      uni.setClipboardData({ data: wechat, success: () => uni.showToast({ title: '微信号已复制', icon: 'success' }) })
+    } else {
+      uni.showToast({ title: '暂无微信', icon: 'none' })
+    }
+  } else if (type === 'card') {
+    const card = c.card
+    const text = [card?.name, card?.title, card?.company, card?.phone, card?.wechat ? `微信：${card.wechat}` : ''].filter(Boolean).join(' · ')
+    uni.showToast({ title: text || '暂无名片', icon: 'none' })
+  } else {
+    uni.showToast({ title: '如需咨询请使用页内联系方式', icon: 'none' })
+  }
+}
 
 /** 所属活动系列（后端 populate 填充 belongsToSeries） */
 const seriesInfo = computed(() => {
@@ -718,6 +912,7 @@ async function loadActivity() {
   try {
     const res = await getActivityDetail(id)
     activity.value = res ?? null
+    setupActivityShare()
   } catch (e) {
     console.error('加载活动详情失败', e)
   } finally {
@@ -728,6 +923,24 @@ async function loadActivity() {
   loadReviews()
   if (activity.value?.status === 'ended' || signedUp.value) loadLearning()
   if (activity.value?.status === 'ended') loadRelated()
+}
+
+// 分享图优先级：promoModules cover.bgImage → promoAssets[0] → 旧 assets[0]，与 promo-cover.vue 一致
+function resolveActivityCover(a: any): string {
+  const cover = (Array.isArray(a?.promoModules) ? a.promoModules : []).find((m: any) => m.type === 'cover')
+  if (cover?.config?.bgImage) return resolveMediaUrl(cover.config.bgImage)
+  const promoAssets = Array.isArray(a?.promoAssets) ? a.promoAssets : []
+  if (promoAssets.length && promoAssets[0]?.url) return resolveMediaUrl(promoAssets[0].url)
+  const legacy = Array.isArray(a?.assets) ? a.assets : []
+  if (legacy.length && legacy[0]?.url) return resolveMediaUrl(legacy[0].url)
+  return ''
+}
+
+function setupActivityShare() {
+  const a = activity.value
+  if (!a?.title) return
+  const desc = (a.description || '').slice(0, 60) || undefined
+  setupPageShare({ title: a.title, desc, imgUrl: resolveActivityCover(a) || undefined })
 }
 
 /** 加载活动费用预览（失败静默保留默认值） */
@@ -848,8 +1061,8 @@ function submitSignupForm() {
 }
 
 function onSignup() {
-  // 配置了奖励且处于微信环境 → 走分步引导；否则维持原报名表单逻辑
-  if (rewardCfg.value && isWechatBrowser()) {
+  // 微信环境必走对比法引导（不再依赖 rewardConfig，无权益时以分级积分兜底）
+  if (isWechatBrowser()) {
     openRewardGuide()
   } else if (formFields.value.length) {
     openSignupForm()
@@ -993,6 +1206,7 @@ async function restoreSignupState() {
     const st = found?.status
     waitlisted.value = st === 'waiting'
     signedUp.value = st === 'active'
+    if (waitlisted.value) waitlistPosition.value = Number(found?.position) || waitlistPosition.value
     if (found?.reviewedAt) reviewed.value = true
     if (signedUp.value) nextTick(() => generateQrcode())
   } catch (e) {
@@ -1122,7 +1336,10 @@ onMounted(() => {
 })
 
 onShow(() => {
-  if (id && activity.value) restoreSignupState()
+  if (id && activity.value) {
+    restoreSignupState()
+    setupActivityShare()
+  }
 })
 </script>
 
@@ -1131,6 +1348,16 @@ onShow(() => {
   min-height: 100vh;
   background: #f5f5f5;
   padding: 20rpx 30rpx 160rpx;
+}
+
+/* 宣传模块区块：背景/文字色取配色方案 --c-bg/--c-text（模板默认或 promoColors 内联覆盖），
+   与独立宣传页 promo.vue 保持一致，避免 --c-bg 定义了却不生效 */
+.promo-section {
+  background: var(--c-bg);
+  color: var(--c-text);
+  border-radius: 16rpx;
+  margin-top: 20rpx;
+  padding: 30rpx 0 40rpx;
 }
 
 .card {
@@ -1487,6 +1714,40 @@ onShow(() => {
 .reward-check.on { background: #667eea; border-color: #667eea; }
 .reward-auto { font-size: 20rpx; color: #fff; }
 .reward-name { flex: 1; font-size: 28rpx; color: #333; }
+
+/* 对比法：授权主卡高亮，静默弱化 */
+.guide-opt.primary.highlight {
+  border-color: #667eea;
+  background: linear-gradient(135deg, rgba(102,126,234,.14) 0%, rgba(118,75,162,.14) 100%);
+}
+.guide-opt.muted {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  padding: 20rpx 8rpx;
+  align-items: flex-start;
+}
+.guide-opt.muted .guide-opt-title.muted-title { font-size: 26rpx; color: #999; font-weight: 400; text-decoration: underline; }
+.guide-benefits { display: flex; flex-direction: column; gap: 6rpx; margin-top: 8rpx; }
+.guide-benefit { font-size: 22rpx; color: #5b4bb5; }
+.guide-btn.auth {
+  margin-top: 20rpx; padding: 16rpx 0; border-radius: 36rpx; text-align: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; font-size: 28rpx; font-weight: 600;
+}
+/* 关注二维码 */
+.qrcode-container { display: flex; justify-content: center; padding: 16rpx 0 8rpx; }
+.qrcode-img { width: 360rpx; height: 360rpx; }
+.qrcode-placeholder, .qrcode-hint { display: block; text-align: center; font-size: 24rpx; color: #999; }
+.qrcode-hint { margin-bottom: 8rpx; }
+/* 积分明细 */
+.points-preview { border: 1rpx solid #eee; border-radius: 12rpx; padding: 8rpx 20rpx; margin-bottom: 16rpx; }
+.points-item { display: flex; justify-content: space-between; align-items: center; padding: 12rpx 0; }
+.points-item-name { font-size: 26rpx; color: #333; }
+.points-item-val { font-size: 26rpx; font-weight: 600; color: #fa8c16; }
+/* 问卷入口 */
+.survey-entry { display: flex; justify-content: space-between; align-items: center; padding: 20rpx; border: 1rpx dashed #667eea; border-radius: 12rpx; margin-bottom: 20rpx; }
+.survey-entry-text { font-size: 26rpx; color: #667eea; }
+.survey-entry-arrow { font-size: 28rpx; color: #667eea; }
 
 .assets-card { padding: 30rpx; }
 .assets-title { display: block; font-size: 28rpx; font-weight: 600; color: #333; margin-bottom: 20rpx; }
