@@ -1,0 +1,58 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  color: #1f2937;
+  background: #ffffff;
+  line-height: 1.6;
+}
+
+.home {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.hero {
+  padding: 48px 0 32px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 32px;
+}
+
+.hero h1 {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.hero p {
+  color: #6b7280;
+}
+
+.articles h2 {
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+
+.articles ul {
+  list-style: none;
+}
+
+.articles li {
+  padding: 8px 0;
+  border-bottom: 1px dashed #e5e7eb;
+}
+
+.articles a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.articles a:hover {
+  text-decoration: underline;
+}
