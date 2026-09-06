@@ -9,6 +9,7 @@ import {
   type GeoArticleType,
 } from "@/lib/geo-article";
 import { buildGeoJsonLd } from "@/lib/geo-seo";
+import GeoAnalytics from "@/components/geo/GeoAnalytics";
 import Breadcrumb from "@/components/modules/Breadcrumb";
 import RiskTip from "@/components/modules/geo/RiskTip";
 import GeoHeader from "@/components/modules/geo/GeoHeader";
@@ -135,6 +136,7 @@ export async function GeoArticleView({
         />
       )}
       {customerServiceUrl && <FloatingService customerServiceUrl={customerServiceUrl} article={article} />}
+      <GeoAnalytics article={article} />
     </main>
   );
 }
