@@ -18,6 +18,11 @@ import Citation from "@/components/modules/geo/Citation";
 import InternalLinks from "@/components/modules/geo/InternalLinks";
 import SummaryTips from "@/components/modules/geo/SummaryTips";
 import InfoBoundary from "@/components/modules/geo/InfoBoundary";
+import ComparisonTable from "@/components/modules/geo/ComparisonTable";
+import LocalList from "@/components/modules/geo/LocalList";
+import TruthBasis from "@/components/modules/geo/TruthBasis";
+import EntityMentions from "@/components/modules/geo/EntityMentions";
+import AuthorCard from "@/components/modules/geo/AuthorCard";
 import Cta from "@/components/modules/geo/Cta";
 import LeadForm from "@/components/modules/geo/LeadForm";
 import FloatingService from "@/components/modules/geo/FloatingService";
@@ -30,6 +35,8 @@ const CATEGORY_LABELS: Record<GeoArticleType, Record<string, string>> = {
   "geo-article": { "zh-CN": "本地资讯", en: "Local Guide" },
   "geo-faq": { "zh-CN": "本地问答", en: "Local FAQ" },
   "local-report": { "zh-CN": "本地报告", en: "Local Report" },
+  "local-comparison": { "zh-CN": "对比评测", en: "Local Comparison" },
+  "local-list": { "zh-CN": "本地清单", en: "Local List" },
 };
 
 /** 站点级绝对 URL（默认语言无前缀，其他语言带 /{locale}/ 前缀） */
@@ -119,10 +126,15 @@ export async function GeoArticleView({
             );
           case "article-header": return <GeoHeader key={i} article={article} />;
           case "geo-body": return <GeoBody key={i} article={article} />;
+          case "comparison-table": return <ComparisonTable key={i} article={article} />;
+          case "local-list": return <LocalList key={i} article={article} />;
           case "citation": return <Citation key={i} article={article} />;
           case "internal-link": return <InternalLinks key={i} article={article} />;
           case "summary-tips": return <SummaryTips key={i} article={article} />;
           case "info-boundary": return <InfoBoundary key={i} article={article} />;
+          case "truth-basis": return <TruthBasis key={i} article={article} />;
+          case "entity-mentions": return <EntityMentions key={i} article={article} />;
+          case "author-card": return <AuthorCard key={i} article={article} />;
           case "cta": return <Cta key={i} article={article} />;
           case "lead-form": return <LeadForm key={i} article={article} />;
           case "geo-footer": return <GeoFooter key={i} site={bundle?.site} bundle={bundle} />;
