@@ -17,7 +17,8 @@ async function listArticleSlugs(locale: string): Promise<string[]> {
   }
 }
 
-/** 静态导出：默认语言（无前缀）按已发布 slug 预渲染，缺失组合不生成 → 自然 404 */
+/** 静态导出：默认语言（无前缀）按已发布 slug 预渲染，缺失组合不生成 → 自然 404；无内容时生成占位路由（页面 notFound()） */
 export async function generateStaticParams() {
-  return (await listArticleSlugs(DEFAULT_LOCALE)).map((slug) => ({ slug }));
+  const slugs = await listArticleSlugs(DEFAULT_LOCALE);
+  return slugs.length > 0 ? slugs.map((slug) => ({ slug })) : [{ slug: "__missing__" }];
 }

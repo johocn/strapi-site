@@ -6,5 +6,6 @@ export { default, generateMetadata } from "../../../[locale]/local-list/[slug]/p
 
 /** 静态导出：默认语言（无前缀）按已发布 local-list slug 预渲染 */
 export async function generateStaticParams() {
-  return (await listGeoArticleSlugs("local-list", DEFAULT_LOCALE)).map((slug) => ({ slug }));
+  const slugs = await listGeoArticleSlugs("local-list", DEFAULT_LOCALE);
+  return slugs.length > 0 ? slugs.map((slug) => ({ slug })) : [{ slug: "__missing__" }];
 }

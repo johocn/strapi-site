@@ -1,4 +1,5 @@
 import { resolveConfig, type SiteConfigBundle } from "@/lib/site-config";
+import BrandLogo from "@/components/brand/BrandLogo";
 
 const FOOTER_LINKS: { label: string; key: "privacyUrl" | "afterSaleUrl" | "returnUrl" }[] = [
   { label: "隐私政策", key: "privacyUrl" },
@@ -28,7 +29,9 @@ export default function GeoFooter({
   return (
     <footer className="geo-footer">
       <div className="geo-footer-info">
-        <span className="geo-footer-site-name">{siteName}</span>
+        <span className="geo-footer-site-name">
+          <BrandLogo siteName={siteName} />
+        </span>
         {organizationAddress && <span className="geo-footer-address">{organizationAddress}</span>}
         {organizationPhone && <span className="geo-footer-phone">{organizationPhone}</span>}
       </div>

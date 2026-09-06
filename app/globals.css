@@ -563,6 +563,38 @@ body {
   color: #374151;
 }
 
+/* 品牌标：图形 + 字标（hover：整体微放大，朝阳上浮、山峦下沉、弧线描出） */
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: transform 0.25s ease;
+}
+.brand-logo:hover {
+  transform: scale(1.08);
+}
+.brand-logo:hover .brand-logo-sun {
+  transform: translateY(-1px) scale(1.12);
+}
+.brand-logo:hover .brand-logo-peaks {
+  transform: translateY(1px);
+}
+.brand-logo:hover .brand-logo-arc {
+  stroke-dashoffset: 0;
+}
+.brand-logo-sun,
+.brand-logo-peaks {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.25s ease;
+}
+.brand-logo-arc {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  transition: stroke-dashoffset 0.35s ease;
+}
+
 .geo-footer-links {
   display: flex;
   flex-wrap: wrap;
