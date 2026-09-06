@@ -6,5 +6,6 @@ export { default, generateMetadata } from "../../../[locale]/local-comparison/[s
 
 /** 静态导出：默认语言（无前缀）按已发布 local-comparison slug 预渲染 */
 export async function generateStaticParams() {
-  return (await listGeoArticleSlugs("local-comparison", DEFAULT_LOCALE)).map((slug) => ({ slug }));
+  const slugs = await listGeoArticleSlugs("local-comparison", DEFAULT_LOCALE);
+  return slugs.length > 0 ? slugs.map((slug) => ({ slug })) : [{ slug: "__missing__" }];
 }

@@ -6,5 +6,6 @@ export { default, generateMetadata } from "../../../[locale]/geo-faq/[slug]/page
 
 /** 静态导出：默认语言（无前缀）按已发布 geo-faq slug 预渲染 */
 export async function generateStaticParams() {
-  return (await listGeoArticleSlugs("geo-faq", DEFAULT_LOCALE)).map((slug) => ({ slug }));
+  const slugs = await listGeoArticleSlugs("geo-faq", DEFAULT_LOCALE);
+  return slugs.length > 0 ? slugs.map((slug) => ({ slug })) : [{ slug: "__missing__" }];
 }
