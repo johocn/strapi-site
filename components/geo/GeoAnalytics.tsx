@@ -7,10 +7,10 @@ export default function GeoAnalytics({ article }: { article: any }) {
   const rewardedRef = useRef(false);
 
   useEffect(() => {
-    trackGeoEvent({ type: "page_view", targetId: article.articleNo });
+    trackGeoEvent({ type: "page_view", targetId: article.articleNo || article.documentId });
     const report = () => {
       const dwell = Math.round((Date.now() - startRef.current) / 1000);
-      trackGeoEvent({ type: "dwell_time", targetId: article.articleNo, dwellTime: dwell });
+      trackGeoEvent({ type: "dwell_time", targetId: article.articleNo || article.documentId, dwellTime: dwell });
     };
     // 阅读时长达标（30s）→ 发放阅读积分（仅一次）
     const timer = window.setTimeout(async () => {
