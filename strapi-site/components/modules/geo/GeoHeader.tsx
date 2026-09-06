@@ -12,12 +12,17 @@ function formatDate(iso?: string): string {
 export default function GeoHeader({ article }: { article: GeoArticle }) {
   const title = article.type === "geo-faq" ? article.faqQuestion || article.title : article.title;
   if (!title) return null;
+  const authorName = article.author?.name || article.authorName;
+  const authorBio = article.author?.bio || article.authorBio;
   const meta = [
     article.publishedAt ? `发布时间 ${formatDate(article.publishedAt)}` : "",
     article.updatedAt ? `更新时间 ${formatDate(article.updatedAt)}` : "",
     article.articleNo ? `编号 ${article.articleNo}` : "",
-    article.authorName ? `作者 ${article.authorName}` : "",
-    article.authorBio ? article.authorBio : "",
+    authorName ? `作者 ${authorName}` : "",
+    authorBio ? authorBio : "",
+    article.reviewerName || article.reviewedAt
+      ? `审核 ${article.reviewerName || ""}${article.reviewedAt ? ` ${formatDate(article.reviewedAt)}` : ""}`
+      : "",
   ].filter(Boolean);
   return (
     <header className="geo-header">
