@@ -1,3 +1,32 @@
+/* ===== 一级设计令牌（兜底层，硬编码于前端；config.global.designTokens 可内联覆盖） ===== */
+:root {
+  --color-primary: #1a73e8;
+  --color-bg: #ffffff;
+  --color-text: #1f2329;
+  --radius: 8px;
+  --space-base: 16px;
+  --space-section: 48px;
+  --font-body: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --font-heading: system-ui, -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --card-columns: 3;
+  --article-image-ratio: 16/9;
+  --detail-max-width: 960px;
+}
+
+/* ===== 二级风格模板覆盖类（页面根元素 class = config.style） ===== */
+.style-toutiao {
+  --card-columns: 1;
+  --article-image-ratio: 16/9;
+}
+
+.style-zhihu {
+  --card-columns: 1;
+  --article-image-ratio: 4/3;
+  --detail-max-width: 720px;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -6,17 +35,110 @@
 
 html,
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
-  color: #1f2937;
-  background: #ffffff;
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg);
   line-height: 1.6;
+}
+
+.site-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-root > main {
+  flex: 1;
+}
+
+/* ===== 一级 layout：Header / Footer ===== */
+.site-header {
+  border-bottom: 1px solid #e5e7eb;
+  background: var(--color-bg);
+}
+
+.site-header.is-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.site-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.site-logo {
+  font-weight: 600;
+  font-family: var(--font-heading);
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+}
+
+.site-nav a {
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.site-nav a:hover {
+  color: var(--color-primary);
+}
+
+.language-switcher {
+  display: flex;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.language-switcher a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.language-switcher a:hover {
+  text-decoration: underline;
+}
+
+.site-footer {
+  border-top: 1px solid #e5e7eb;
+  margin-top: var(--space-section);
+}
+
+.site-footer-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.site-footer-name {
+  font-weight: 500;
+}
+
+.site-footer-icp {
+  color: #6b7280;
+  text-decoration: none;
 }
 
 .home {
   max-width: 960px;
   margin: 0 auto;
-  padding: 48px 24px;
+  padding: var(--space-section) 24px;
+  width: 100%;
 }
 
 .hero {
@@ -28,6 +150,7 @@ body {
 .hero h1 {
   font-size: 32px;
   margin-bottom: 8px;
+  font-family: var(--font-heading);
 }
 
 .hero p {
@@ -37,6 +160,7 @@ body {
 .articles h2 {
   font-size: 20px;
   margin-bottom: 16px;
+  font-family: var(--font-heading);
 }
 
 .articles ul {
@@ -49,10 +173,147 @@ body {
 }
 
 .articles a {
-  color: #2563eb;
+  color: var(--color-primary);
   text-decoration: none;
 }
 
 .articles a:hover {
   text-decoration: underline;
+}
+
+/* ===== 四级模块样式 ===== */
+
+/* article-feed：列数由配置驱动（--feed-columns），默认单列 */
+.article-feed-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(var(--feed-columns, 1), 1fr);
+  gap: 0 24px;
+}
+
+/* article-grid：列数由配置/二级风格驱动（--card-columns） */
+.module-article-grid h2 {
+  font-size: 20px;
+  margin-bottom: 16px;
+  font-family: var(--font-heading);
+}
+
+.article-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(var(--card-columns, 3), 1fr);
+  gap: 24px;
+}
+
+.article-grid-item a {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.article-grid-item a:hover {
+  text-decoration: underline;
+}
+
+.article-grid-cover {
+  aspect-ratio: var(--article-image-ratio);
+  border-radius: var(--radius);
+  background: #f3f4f6;
+  margin-bottom: 8px;
+}
+
+/* pagination */
+.pagination {
+  display: flex;
+  gap: 8px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.pagination a {
+  padding: 4px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--color-text);
+}
+
+.pagination a.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+/* map-block：腾讯地图 URI 外链卡片（占位形态） */
+.map-block {
+  margin: 32px 0;
+  padding: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+}
+
+.map-block h2 {
+  font-size: 20px;
+  margin-bottom: 8px;
+  font-family: var(--font-heading);
+}
+
+.map-block-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.map-block-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.map-block-link:hover {
+  text-decoration: underline;
+}
+
+/* ===== 详情页（detail 页面类型） ===== */
+.article-detail {
+  max-width: var(--detail-max-width);
+  margin: 0 auto;
+  padding: 48px 24px;
+  width: 100%;
+}
+
+.article-breadcrumb {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 24px;
+}
+
+.article-breadcrumb a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.article-detail h1 {
+  font-size: 28px;
+  margin-bottom: 12px;
+  font-family: var(--font-heading);
+}
+
+.article-detail time {
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.article-excerpt {
+  color: #4b5563;
+  margin: 16px 0;
+}
+
+.article-content {
+  margin-top: 24px;
+  line-height: 1.8;
+  white-space: pre-wrap;
 }
