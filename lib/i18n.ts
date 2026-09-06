@@ -19,6 +19,14 @@ export function localizedPath(locale: string, path: string): string {
   return `/${resolved}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+/**
+ * 备选语言段参数：仅非默认语言（当前 en）生成 /{locale}/ 前缀 URL。
+ * 默认语言（zh-CN）由 (default) 路由组在根路径（无前缀）生成，不在此列。
+ */
+export function alternateLocaleSegments(): { locale: string }[] {
+  return SUPPORTED_LOCALES.filter((l) => l !== DEFAULT_LOCALE).map((l) => ({ locale: l }));
+}
+
 export const UI_STRINGS: Record<string, Record<string, string>> = {
   "zh-CN": { navHome: "首页", navArticles: "资讯", langName: "EN" },
   en: { navHome: "Home", navArticles: "Articles", langName: "中文" },

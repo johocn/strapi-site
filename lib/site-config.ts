@@ -1,3 +1,5 @@
+import { API_ORIGIN } from "@/lib/env";
+
 /**
  * 站点合并配置读取（前端四级模板体系）
  *
@@ -19,21 +21,14 @@ export interface SiteConfigBundle {
   [key: string]: any;
 }
 
-const cache = new Map<string, { data: SiteConfigBundle; ts: number }>();
-const TTL = 60_000;
-
 /**
- * 拉取当前站点合并配置，按 siteUrl 短 TTL（60s）缓存。
+ * 拉取当前站点合并配置（静态导出：构建期固化，一次拉取即可）。
  * 失败时返回缓存值；无缓存则返回 null（页面/模块走内置兜底渲染）。
  */
 export async function getSiteConfig(siteUrl: string): Promise<SiteConfigBundle | null> {
-  const hit = cache.get(siteUrl);
-  if (hit && Date.now() - hit.ts < TTL) return hit.data;
   try {
-    const res = await fetch(`${siteUrl}/api/zhao-common/v1/site-config/merged`, {
-      cache: "no-store",
-    });
-    if (!res.ok) return hit?.data ?? null;
+    const res = await fetch(`${API_ORIGIN}/api/zhao-common/v1/site-config/merged`);
+    if (!res.ok) return null;
     const json = await res.json();
     const data = (json?.data || json || {}) as Record<string, any>;
     const bundle: SiteConfigBundle = {
@@ -42,10 +37,9 @@ export async function getSiteConfig(siteUrl: string): Promise<SiteConfigBundle |
       config: data.config && typeof data.config === "object" ? data.config : {},
       templateMeta: data.templateMeta ?? null,
     };
-    cache.set(siteUrl, { data: bundle, ts: Date.now() });
     return bundle;
   } catch {
-    return hit?.data ?? null;
+    return null;
   }
 }
 

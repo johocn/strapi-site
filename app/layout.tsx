@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { DEFAULT_LOCALE } from "@/lib/i18n";
 import "./globals.css";
 
@@ -11,14 +10,12 @@ export const metadata: Metadata = {
   description: "zhao-site C 端官网（Next.js）",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // middleware 已设置 x-locale（无前缀请求经 rewrite 也带该 header）
-  const headersList = await headers();
-  const locale = headersList.get("x-locale") ?? DEFAULT_LOCALE;
+  // 静态导出：无 middleware/x-locale header，html lang 取默认语言
   return (
-    <html lang={locale}>
+    <html lang={DEFAULT_LOCALE}>
       <body>{children}</body>
     </html>
   );

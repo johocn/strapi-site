@@ -1,10 +1,14 @@
-import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n";
+import { DEFAULT_LOCALE, normalizeLocale, alternateLocaleSegments } from "@/lib/i18n";
 import { getSiteConfig, resolveConfig } from "@/lib/site-config";
+import { API_ROOT, SITE_URL } from "@/lib/env";
 import Hero from "@/components/modules/Hero";
 import ArticleFeed from "@/components/modules/ArticleFeed";
 import MapBlock from "@/components/modules/MapBlock";
 
-export const dynamic = "force-dynamic";
+/** 静态导出：仅备选语言（en）带 /en/ 前缀；默认语言由 (default) 路由组在根路径生成 */
+export async function generateStaticParams() {
+  return alternateLocaleSegments();
+}
 
 type SiteInfo = {
   siteName: string;
@@ -19,17 +23,12 @@ type Article = {
   slug: string;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/zhao-website/v1";
-// 服务端组件 fetch 必须用绝对 URL（相对路径由代理在 :3000 层解析）
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-const API_ROOT = `${SITE_URL}${API_BASE}`;
-
 /** 首页无配置时回退的内置模块列表（一级兜底，硬编码于前端） */
 const DEFAULT_HOME_MODULES = ["hero", "article-feed"];
 
 async function getSiteInfo(): Promise<SiteInfo | null> {
   try {
-    const res = await fetch(`${API_ROOT}/site-info`, { cache: "no-store" });
+    const res = await fetch(`${API_ROOT}/site-info`);
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -39,9 +38,7 @@ async function getSiteInfo(): Promise<SiteInfo | null> {
 
 async function getFeaturedArticles(locale: string): Promise<Article[]> {
   try {
-    const res = await fetch(`${API_ROOT}/articles/featured?locale=${locale}`, {
-      cache: "no-store",
-    });
+    const res = await fetch(`${API_ROOT}/articles/featured?locale=${locale}`);
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : data?.results ?? [];
@@ -53,7 +50,7 @@ async function getFeaturedArticles(locale: string): Promise<Article[]> {
 /** 地图模块数据源：seo-meta（geo 四标签，geoPosition 落在 geo["geo.position"]） */
 async function getSeoMeta(): Promise<any> {
   try {
-    const res = await fetch(`${API_ROOT}/seo-meta`, { cache: "no-store" });
+    const res = await fetch(`${API_ROOT}/seo-meta`);
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -64,7 +61,7 @@ async function getSeoMeta(): Promise<any> {
 export default async function HomePage({
   params,
 }: {
-  params: Promise<{ locale: string }>;
+  params: Promise<{ locale?: string }>;
 }) {
   const { locale: rawLocale } = await params;
   const locale = normalizeLocale(rawLocale) ?? DEFAULT_LOCALE;

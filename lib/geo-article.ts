@@ -1,5 +1,6 @@
 import { resolveConfig } from "@/lib/site-config";
 import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n";
+import { API_ROOT } from "@/lib/env";
 
 export type GeoArticleType = "geo-article" | "geo-faq" | "local-report" | "local-comparison" | "local-list";
 
@@ -68,17 +69,28 @@ export type GeoArticle = {
   localizations?: { id: number; locale: string; slug: string; title: string }[];
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/zhao-website/v1";
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-const API_ROOT = `${SITE_URL}${API_BASE}`;
-
 export async function getGeoArticle(slug: string, locale: string): Promise<{ status: number; article: GeoArticle | null }> {
   try {
-    const res = await fetch(`${API_ROOT}/geo-articles/${encodeURIComponent(slug)}?locale=${locale}`, { cache: "no-store" });
+    const res = await fetch(`${API_ROOT}/geo-articles/${encodeURIComponent(slug)}?locale=${locale}`);
     if (!res.ok) return { status: res.status, article: null };
     return { status: res.status, article: await res.json() };
   } catch {
     return { status: 500, article: null };
+  }
+}
+
+/** 构建期枚举某类型已发布文章的 slug（静态导出 generateStaticParams 数据源） */
+export async function listGeoArticleSlugs(type: GeoArticleType, locale: string): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `${API_ROOT}/geo-articles?locale=${locale}&type=${type}&pageSize=200`
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    const results = Array.isArray(data) ? data : data?.results ?? [];
+    return results.map((r: any) => r?.slug).filter(Boolean);
+  } catch {
+    return [];
   }
 }
 
