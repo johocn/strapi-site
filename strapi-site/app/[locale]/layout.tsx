@@ -1,5 +1,4 @@
-import { headers } from "next/headers";
-import { DEFAULT_LOCALE } from "@/lib/i18n";
+import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n";
 import { getSiteConfig, resolveConfig } from "@/lib/site-config";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -35,15 +34,16 @@ function styleClass(style: any): string {
 }
 
 /**
- * [locale] 级布局：读取合并配置一次（getSiteConfig 内部 60s TTL 缓存），
- * 注入设计令牌 + 二级风格 class（config.style），挂载 Header/Footer。
+ * [locale] 级布局：读取合并配置一次，注入设计令牌 + 二级风格 class（config.style），
+ * 挂载 Header/Footer。语言取 params（静态导出下不可用 headers()）。
  * 配置经 props 传给服务端组件（不建 context：模块均为服务端组件，props 最简）。
  */
 export default async function LocaleLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
-  const headersList = await headers();
-  const locale = headersList.get("x-locale") ?? DEFAULT_LOCALE;
+  params,
+}: Readonly<{ children: React.ReactNode; params: Promise<{ locale?: string }> }>) {
+  const { locale: rawLocale } = await params;
+  const locale = normalizeLocale(rawLocale) ?? DEFAULT_LOCALE;
 
   const bundle = await getSiteConfig(SITE_URL);
   const style = resolveConfig(bundle, ["style"]) ?? "default";

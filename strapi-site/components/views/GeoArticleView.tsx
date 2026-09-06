@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { DEFAULT_LOCALE, UI_STRINGS, localizedPath } from "@/lib/i18n";
 import { getSiteConfig } from "@/lib/site-config";
 import {
@@ -95,10 +95,7 @@ export async function GeoArticleView({
   locale: string;
 }) {
   const { status, article } = await getGeoArticle(slug, locale);
-  // 非默认语言且原文不存在 → 302 回退默认语言同 slug
-  if (status === 404 && locale !== DEFAULT_LOCALE) {
-    redirect(localizedPath(DEFAULT_LOCALE, `${resolveGeoRoutePrefix(type)}/${slug}`));
-  }
+  // 静态导出：缺失组合已由 generateStaticParams 排除，此处仅兜底
   if (!article) notFound();
 
   const bundle = await getSiteConfig(SITE_URL);

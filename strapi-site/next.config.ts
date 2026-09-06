@@ -1,17 +1,15 @@
 import type { NextConfig } from "next";
 
-const API_UPSTREAM = "http://localhost:1337/api";
-
+/**
+ * 静态导出配置：输出到 out/，部署到 openresty 静态站点（www.joho.cn）。
+ * 原 /api、/sitemap.xml、/robots.txt、/llms.txt 代理改由 openresty 反向代理承担
+ * （next.config rewrites 在 output: export 下不支持）。
+ */
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  async rewrites() {
-    return [
-      { source: "/api/:path*", destination: `${API_UPSTREAM}/:path*` },
-      { source: "/sitemap.xml", destination: `${API_UPSTREAM}/zhao-website/v1/sitemap.xml` },
-      { source: "/robots.txt", destination: `${API_UPSTREAM}/zhao-website/v1/robots.txt` },
-      { source: "/llms.txt", destination: `${API_UPSTREAM}/zhao-website/v1/llms.txt` },
-    ];
-  },
+  output: "export",
+  images: { unoptimized: true },
+  trailingSlash: false,
 };
 
 export default nextConfig;
