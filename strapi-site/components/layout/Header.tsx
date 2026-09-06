@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DEFAULT_LOCALE, localizedPath, UI_STRINGS } from "@/lib/i18n";
 import { resolveConfig, type SiteConfigBundle } from "@/lib/site-config";
+import BrandLogo from "@/components/brand/BrandLogo";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 type HeaderProps = {
@@ -23,7 +24,7 @@ export default function Header({ bundle, locale }: HeaderProps) {
     <header className={`site-header${sticky ? " is-sticky" : ""}`}>
       <div className="site-header-inner">
         <Link href={localizedPath(locale, "/")} className="site-logo">
-          {siteName}
+          <BrandLogo siteName={siteName} size={17} />
         </Link>
         <nav className="site-nav" aria-label="主导航">
           <Link href={localizedPath(locale, "/")}>{ui.navHome}</Link>
