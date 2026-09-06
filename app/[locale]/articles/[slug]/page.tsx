@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import {
   DEFAULT_LOCALE,
-  SUPPORTED_LOCALES,
   normalizeLocale,
   localizedPath,
 } from "@/lib/i18n";
@@ -16,14 +15,22 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/zhao-website/v1";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 const API_ROOT = `${SITE_URL}${API_BASE}`;
 
+type Localization = {
+  locale: string;
+  slug: string;
+  title?: string;
+};
+
 type Article = {
   id: number;
   documentId?: string;
+  locale?: string;
   title: string;
   slug: string;
   excerpt?: string;
   content?: string;
   publishedAt?: string;
+  localizations?: Localization[];
 };
 
 /** 详情页无配置时回退的内置模块列表 */
@@ -59,17 +66,21 @@ export async function generateMetadata({
   const locale = normalizeLocale(rawLocale) ?? DEFAULT_LOCALE;
 
   const current = await getArticle(slug, locale);
-  if (current.status === 404) return {};
+  if (current.status === 404 || !current.article) return {};
 
-  // 仅输出实际存在的翻译版本 + x-default（存在性探测）
+  const article = current.article;
+  // 基于 document 的兄弟翻译生成 alternate（slug 因 localized 可跨语言不同，不能按 slug 探测）
   const languages: Record<string, string> = {};
-  for (const alt of SUPPORTED_LOCALES) {
-    const probe = await getArticle(slug, alt);
-    if (probe.status === 200) {
-      languages[alt] = absoluteUrl(localizedPath(alt, `/articles/${slug}`));
-    }
+  languages[article.locale ?? locale] = absoluteUrl(
+    localizedPath(locale, `/articles/${article.slug}`)
+  );
+  for (const loc of article.localizations ?? []) {
+    languages[loc.locale] = absoluteUrl(localizedPath(loc.locale, `/articles/${loc.slug}`));
   }
-  languages["x-default"] = absoluteUrl(localizedPath(DEFAULT_LOCALE, `/articles/${slug}`));
+  // x-default 指向默认语言版本（无翻译则回退当前版本）
+  const defLoc = (article.localizations ?? []).find((l) => l.locale === DEFAULT_LOCALE);
+  const defSlug = defLoc?.slug ?? article.slug;
+  languages["x-default"] = absoluteUrl(localizedPath(DEFAULT_LOCALE, `/articles/${defSlug}`));
   return { alternates: { languages } };
 }
 
