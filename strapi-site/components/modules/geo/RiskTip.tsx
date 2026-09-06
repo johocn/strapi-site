@@ -1,15 +1,49 @@
-import type { GeoArticle } from "@/lib/geo-article";
+import type { RiskType } from "@/lib/geo-article";
 
-/**
- * GEO 模块：金融风险提示条（isFinance 时置顶展示，不可折叠）。
- */
-export default function RiskTip({ article }: { article: GeoArticle }) {
-  if (!article.isFinance) return null;
-  const text = article.riskDisclaimer || "仅供学习，不构成投资建议。市场有风险，决策需谨慎。";
+type RiskTipContent = { label: string; text: string };
+
+/** 枚举 → 标签 + 默认文案；riskDisclaimer 非空时覆盖 text */
+export const RISK_TIP_MAP: Record<Exclude<RiskType, "none">, RiskTipContent> = {
+  "finance-general": { label: "风险提示", text: "仅供学习，不构成投资建议、理财推荐及交易依据。市场有风险，决策需谨慎。过往业绩、历史走势不代表未来收益，无任何保本保收益承诺。所有投资行为请投资者独立判断、自行承担风险，结合自身风险承受能力、财务状况审慎决策，切勿盲目投资、跟风交易。" },
+  "finance-stock": { label: "股票风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。股票价格受宏观经济、行业政策、市场情绪、公司经营、突发事件等多重因素影响，价格波动剧烈，存在本金亏损、价格回撤、个股退市等风险，无固定收益保障，投资者需充分知晓市场波动风险，审慎参与交易。" },
+  "finance-fund": { label: "基金风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。公募基金、私募基金、指数基金、定投产品等所有基金产品均不保本、不保收益，已全面打破刚性兑付。基金净值随市场行情实时波动，存在本金亏损、收益不及预期、清盘退市等风险，不同类型基金风险等级差异较大，需匹配自身风险承受能力选择。" },
+  "finance-bond": { label: "债券风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。国债、企业债、城投债、信用债等各类债券并非零风险产品，存在信用违约、利率波动、流动性不足、估值下跌、无法按期兑付本息等风险，不存在绝对保本保收益，投资者需审慎甄别发行主体资质，理性投资。" },
+  "finance-wealth": { label: "理财产品风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。银行理财、资管理财等各类理财产品已全面打破刚性兑付，不承诺保本保息。产品净值随市场波动，存在本金亏损、收益浮动、提前终止、流动性受限等风险，不同风险评级产品亏损概率不同，投资者需仔细阅读产品说明书，匹配自身风险承受能力。" },
+  "finance-futures": { label: "期货期权风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。期货、期权交易自带高杠杆属性，价格波动幅度极大，交易风险极高。投资者可能在短时间内产生大幅亏损，甚至损失全部本金，面临强制平仓风险。该类产品仅适合专业度高、风险承受能力极强的合规投资者，普通投资者请勿盲目参与。" },
+  "finance-precious-metals": { label: "贵金属风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。黄金、白银、铂金等贵金属现货、递延、合约及纸贵金属产品，价格受国际局势、美元汇率、全球货币政策、大宗商品行情影响极大，波动频繁且不确定性强，存在本金亏损、价差亏损、流动性不足等多重投资风险。" },
+  "finance-forex": { label: "外汇风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。合法合规外汇交易受国际汇率、地缘政治、各国货币政策、国际资本市场波动影响显著，行情不确定性极高。杠杆式外汇交易风险加剧，极易产生大幅本金亏损，且境内非法外汇交易不受法律保护，投资者需严守合规交易渠道。" },
+  "finance-trust": { label: "信托产品风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。信托产品无刚性兑付保障，存在信用违约、项目逾期、流动性不足、政策变动、本息延期兑付甚至本金亏损等风险。产品锁定期较长、中途退出难度大，仅适合高净值、高风险承受能力投资者，需充分尽调产品底层资产风险。" },
+  "finance-convertible-bond": { label: "可转债风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。可转债兼具债权与股权双重属性，价格高度依赖正股走势，受股市波动影响显著。存在价格大幅下跌、转股失败、溢价亏损、强制赎回、标的退市、流动性枯竭等多重风险，并非稳健保本产品，普通投资者需谨慎参与。" },
+  "finance-hk-us-stock": { label: "港股美股风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。港股、美股无涨跌幅限制，交易机制、结算规则、市场制度与A股差异较大，受海外宏观政策、国际资本流动、地缘局势、汇率波动影响深远。存在大幅波动、隔夜跳空、流动性不足、汇率亏损、监管政策变动等多重风险，投资风险显著高于A股市场。" },
+  "finance-index": { label: "指数投资风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。指数及指数相关投资无法规避市场系统性风险，受大盘行情、行业周期、政策调整影响会出现大幅波动。指数基金、指数定投、指数衍生品均不保本，存在长期被套、本金亏损、收益不达预期的风险，不存在稳赚、保本增值的投资效果。" },
+  "finance-insurance": { label: "保险产品风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。保险产品以保障功能为主，理财型保险收益具有不确定性，不承诺保本保息。产品存在退保亏损、现金价值不足、保障条款限制、收益浮动、缴费周期长、流动性差等风险，请勿将保险等同于存款、理财，需仔细核对条款后审慎投保。" },
+  "finance-otc": { label: "场外衍生品风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。场外衍生品交易结构复杂、风险等级极高，缺乏公开透明交易市场，流动性差、估值难度大，存在杠杆亏损、对手方违约、政策合规、无法平仓等多重风险，仅限合规专业机构及合格投资者参与，普通投资者严禁参与。" },
+  "finance-reverse-repo": { label: "国债逆回购风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。国债逆回购整体风险极低，但并非零风险，存在极端市场下交易失败、资金到账延迟、收益低于预期、节假日资金闲置无收益等情况，收益随市场资金面波动，无固定收益保障，需理性看待低风险理财属性。" },
+  "finance-cd": { label: "存单类产品风险提示", text: "仅供学习，不构成投资建议。市场有风险，决策需谨慎。大额存单、结构性存款等产品，结构性存款不保本不保息，受挂钩标的行情影响收益浮动；大额存单存在提前支取利息损失、流动性受限、利率波动等风险，不存在绝对无风险，需结合自身资金使用需求投资。" },
+  health: { label: "健康提示", text: "本内容仅供参考，不构成医疗诊断或治疗建议，如有不适请及时就医。" },
+  legal: { label: "法律提示", text: "本内容仅供参考，不构成法律意见，具体问题请咨询专业律师。" },
+  other: { label: "声明", text: "本文仅为信息分享，不构成任何专业建议。" },
+};
+
+export function riskTipContent(riskType?: RiskType): RiskTipContent | null {
+  if (!riskType || riskType === "none") return null;
+  return RISK_TIP_MAP[riskType];
+}
+
+export default function RiskTip({
+  riskType,
+  riskDisclaimer,
+}: {
+  riskType?: RiskType;
+  riskDisclaimer?: string;
+}) {
+  const tip = riskTipContent(riskType);
+  if (!tip) return null;
+  const text = riskDisclaimer?.trim() || tip.text;
   return (
-    <aside className="geo-risk-tip" role="alert" aria-live="polite">
-      <span className="geo-risk-tip-label">风险提示</span>
-      <p>{text}</p>
-    </aside>
+    <div className="geo-risk-tip" role="note">
+      <span className="geo-risk-tip-tag">{tip.label}</span>
+      <p className="geo-risk-tip-text">{text}</p>
+    </div>
   );
 }

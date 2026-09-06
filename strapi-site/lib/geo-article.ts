@@ -4,6 +4,13 @@ import { API_ROOT } from "@/lib/env";
 
 export type GeoArticleType = "geo-article" | "geo-faq" | "local-report" | "local-comparison" | "local-list";
 
+export type RiskType =
+  | "none" | "finance-general" | "finance-stock" | "finance-fund" | "finance-bond"
+  | "finance-wealth" | "finance-futures" | "finance-precious-metals" | "finance-forex"
+  | "finance-trust" | "finance-convertible-bond" | "finance-hk-us-stock" | "finance-index"
+  | "finance-insurance" | "finance-otc" | "finance-reverse-repo" | "finance-cd"
+  | "health" | "legal" | "other";
+
 export type GeoArticle = {
   id: number;
   documentId: string;
@@ -56,7 +63,7 @@ export type GeoArticle = {
   comparisonData?: { dimension?: string; items?: { name?: string; score?: string | number; note?: string }[] }[];
   listItems?: { name?: string; desc?: string; price?: string; link?: string }[];
   coverImage?: any;
-  isFinance?: boolean;
+  riskType?: RiskType;
   riskDisclaimer?: string;
   ctaType?: "none" | "download-list" | "consult-appointment";
   leadFormEnabled?: boolean;
