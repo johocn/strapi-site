@@ -16,13 +16,17 @@ const ROUTE_PREFIX: Record<string, string> = {
   "local-report": "/local-report", "local-comparison": "/local-comparison", "local-list": "/local-list",
 };
 
-function relationItems(entity: KnowledgeEntity): { label: string; value: string; href?: string }[] {
+/** 知识关系条目：outgoing=本实体作为主体；incoming=本实体作为客体（关联实体为 subjectEntity） */
+function relationItems(entity: KnowledgeEntity, direction: "outgoing" | "incoming"): { label: string; value: string; href?: string }[] {
   const items: { label: string; value: string; href?: string }[] = [];
-  const outgoing = Array.isArray(entity.outgoing) ? entity.outgoing : [];
-  for (const rel of outgoing) {
-    if (rel.objectEntity?.name) {
-      const href = rel.objectEntity.slug ? `/knowledge/${rel.objectEntity.slug}` : undefined;
-      items.push({ label: rel.predicate, value: rel.objectEntity.name, href });
+  const rels = direction === "incoming"
+    ? (Array.isArray(entity.incoming) ? entity.incoming : [])
+    : (Array.isArray(entity.outgoing) ? entity.outgoing : []);
+  for (const rel of rels) {
+    const target = direction === "incoming" ? rel.subjectEntity : rel.objectEntity;
+    if (target?.name) {
+      const href = target.slug ? `/knowledge/${target.slug}` : undefined;
+      items.push({ label: rel.predicate, value: target.name, href });
     } else if (rel.objectText) {
       items.push({ label: rel.predicate, value: rel.objectText });
     } else if (rel.objectValue !== undefined && rel.objectValue !== null) {
@@ -45,7 +49,8 @@ export async function KnowledgeEntityView({ slug, locale }: { slug: string; loca
   const { status, entity } = await getKnowledgeEntity(slug);
   if (status === 404 || !entity) notFound();
 
-  const relations = relationItems(entity);
+  const outgoing = relationItems(entity, "outgoing");
+  const incoming = relationItems(entity, "incoming");
   const articles = Array.isArray(entity.articles) ? entity.articles : [];
 
   return (
@@ -62,17 +67,35 @@ export async function KnowledgeEntityView({ slug, locale }: { slug: string; loca
         ) : null}
       </header>
 
-      {relations.length > 0 ? (
+      {outgoing.length > 0 || incoming.length > 0 ? (
         <section className="entity-section">
           <h2>知识关系</h2>
-          <ul className="entity-relations">
-            {relations.map((r, i) => (
-              <li key={i}>
-                <span className="rel-predicate">{r.label}</span>
-                {r.href ? <a href={localizedPath(locale, r.href)}>{r.value}</a> : <span>{r.value}</span>}
-              </li>
-            ))}
-          </ul>
+          {outgoing.length > 0 ? (
+            <>
+              <h3 className="entity-subsection">本实体指向</h3>
+              <ul className="entity-relations">
+                {outgoing.map((r, i) => (
+                  <li key={`o${i}`}>
+                    <span className="rel-predicate">{r.label}</span>
+                    {r.href ? <a href={localizedPath(locale, r.href)}>{r.value}</a> : <span>{r.value}</span>}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+          {incoming.length > 0 ? (
+            <>
+              <h3 className="entity-subsection">指向本实体</h3>
+              <ul className="entity-relations">
+                {incoming.map((r, i) => (
+                  <li key={`i${i}`}>
+                    {r.href ? <a href={localizedPath(locale, r.href)}>{r.value}</a> : <span>{r.value}</span>}
+                    <span className="rel-predicate">{r.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
         </section>
       ) : null}
 

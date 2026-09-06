@@ -624,6 +624,7 @@ body {
 .entity-meta { font-size: 12px; }
 .entity-section { margin-bottom: 28px; }
 .entity-section h2 { font-size: 18px; margin-bottom: 12px; }
+.entity-subsection { font-size: 13px; color: var(--text-muted, #6b7280); font-weight: 600; margin: 14px 0 8px; }
 .entity-relations, .entity-articles { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .entity-relations li, .entity-articles li { display: flex; gap: 10px; align-items: baseline; padding: 10px 14px; border: 1px solid var(--border, #e5e7eb); border-radius: 8px; }
 .rel-predicate { flex: 0 0 auto; color: var(--brand, #4f46e5); font-size: 13px; }
