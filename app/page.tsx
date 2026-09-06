@@ -16,10 +16,13 @@ type Article = {
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/zhao-website/v1";
+// 服务端组件 fetch 必须用绝对 URL（相对路径由代理在 :3000 层解析）
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const API_ROOT = `${SITE_URL}${API_BASE}`;
 
 async function getSiteInfo(): Promise<SiteInfo | null> {
   try {
-    const res = await fetch(`${API_BASE}/site-info`, { cache: "no-store" });
+    const res = await fetch(`${API_ROOT}/site-info`, { cache: "no-store" });
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -29,7 +32,7 @@ async function getSiteInfo(): Promise<SiteInfo | null> {
 
 async function getFeaturedArticles(): Promise<Article[]> {
   try {
-    const res = await fetch(`${API_BASE}/articles/featured`, {
+    const res = await fetch(`${API_ROOT}/articles/featured`, {
       cache: "no-store",
     });
     if (!res.ok) return [];
