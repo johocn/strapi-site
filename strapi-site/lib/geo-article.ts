@@ -1,0 +1,74 @@
+import { resolveConfig } from "@/lib/site-config";
+import { DEFAULT_LOCALE, normalizeLocale } from "@/lib/i18n";
+
+export type GeoArticleType = "geo-article" | "geo-faq" | "local-report";
+
+export type GeoArticle = {
+  id: number;
+  documentId: string;
+  title: string;
+  slug: string;
+  content: string;
+  type: GeoArticleType;
+  faqQuestion?: string;
+  publishedAt?: string;
+  updatedAt?: string;
+  articleNo?: string;
+  authorName?: string;
+  authorBio?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  sourcePublishedAt?: string;
+  serviceScope?: string;
+  businessData?: { period?: string; content?: string; caliber?: string }[];
+  caseContent?: string;
+  internalLinks?: { text?: string; url?: string }[];
+  metaTitle?: string;
+  metaDescription?: string;
+  canonicalUrl?: string;
+  jsonLdType?: "Article" | "FAQPage" | "LocalBusiness";
+  coverImage?: any;
+  isFinance?: boolean;
+  riskDisclaimer?: string;
+  ctaType?: "none" | "download-list" | "consult-appointment";
+  leadFormEnabled?: boolean;
+  vendureProductListId?: string;
+  readPoints?: number;
+  miniProgramPath?: string;
+  summaryPoints?: string;
+  localTips?: string;
+  infoBoundary?: string;
+  localizations?: { id: number; locale: string; slug: string; title: string }[];
+};
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "/api/zhao-website/v1";
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const API_ROOT = `${SITE_URL}${API_BASE}`;
+
+export async function getGeoArticle(slug: string, locale: string): Promise<{ status: number; article: GeoArticle | null }> {
+  try {
+    const res = await fetch(`${API_ROOT}/geo-articles/${encodeURIComponent(slug)}?locale=${locale}`, { cache: "no-store" });
+    if (!res.ok) return { status: res.status, article: null };
+    return { status: res.status, article: await res.json() };
+  } catch {
+    return { status: 500, article: null };
+  }
+}
+
+export const DEFAULT_GEO_MODULES = [
+  "risk-tip", "breadcrumb", "article-header", "geo-body", "citation",
+  "internal-link", "summary-tips", "info-boundary", "cta", "lead-form", "geo-footer",
+];
+
+export function getGeoModules(bundle: any, type: GeoArticleType): string[] {
+  const key = type === "geo-faq" ? "geoFaq" : type === "local-report" ? "localReport" : "geoArticle";
+  const configured = resolveConfig(bundle, ["pages", key, "modules"]);
+  if (Array.isArray(configured) && configured.length > 0) return configured;
+  const detail = resolveConfig(bundle, ["pages", "detail", "modules"]);
+  if (Array.isArray(detail) && detail.length > 0) return detail;
+  return DEFAULT_GEO_MODULES;
+}
+
+export function resolveGeoRoutePrefix(type: GeoArticleType): string {
+  return type === "geo-faq" ? "/geo-faq" : type === "local-report" ? "/local-report" : "/geo-article";
+}
