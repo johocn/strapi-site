@@ -16,6 +16,8 @@ export type GeoArticle = {
   articleNo?: string;
   authorName?: string;
   authorBio?: string;
+  reviewerName?: string;
+  reviewedAt?: string;
   sourceName?: string;
   sourceUrl?: string;
   sourcePublishedAt?: string;
