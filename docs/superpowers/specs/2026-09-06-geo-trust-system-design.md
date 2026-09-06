@@ -77,7 +77,7 @@
 - 模块 switch 加 5 个 case
 - 默认模块顺序扩展：
   `risk-tip → breadcrumb → article-header → geo-body → comparison-table → local-list → citation → internal-link → summary-tips → info-boundary → truth-basis → entity-mentions → author-card → cta → lead-form → geo-footer`
-- `GeoArticle` 类型增加 author/reviewer/truthBasis/mentionedEntities/comparisonData/listItems（editor 仅后台记录，不参与前端 populate，不进类型）
+- `GeoArticle` 类型增加 author/truthBasis/mentionedEntities/comparisonData/listItems（editor 与 reviewer 均仅后台记录，不参与前端 populate、不进类型；前端审核展示用扁平 reviewerName/reviewedAt）
 - `getGeoArticle` 请求带 `?populate=author,truthBasis,mentionedEntities`
 
 ### 3.4 SEO（`lib/geo-seo.ts`）
