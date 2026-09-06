@@ -106,7 +106,7 @@ export async function GeoArticleView({
 
   return (
     <main className="geo-page">
-      {article.isFinance && <RiskTip article={article} />}
+      <RiskTip riskType={article.riskType} riskDisclaimer={article.riskDisclaimer} />
       {modules.map((name, i) => {
         switch (name) {
           case "breadcrumb":
