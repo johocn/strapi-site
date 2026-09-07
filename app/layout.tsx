@@ -4,8 +4,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "strapi-site",
-    template: "%s | strapi-site",
+    default: "joho.cn",
+    template: "%s",
   },
   description: "zhao-site C 端官网（Next.js）",
 };

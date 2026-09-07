@@ -1,4 +1,5 @@
-import { DEFAULT_LOCALE, normalizeLocale, alternateLocaleSegments } from "@/lib/i18n";
+import type { Metadata } from "next";
+import { DEFAULT_LOCALE, normalizeLocale, alternateLocaleSegments, localizedPath } from "@/lib/i18n";
 import { getSiteConfig, resolveConfig } from "@/lib/site-config";
 import { API_ROOT, SITE_URL } from "@/lib/env";
 import Hero from "@/components/modules/Hero";
@@ -58,6 +59,22 @@ async function getSeoMeta(): Promise<any> {
   }
 }
 
+/** 首页元数据：站点名/描述 + canonical（站点级 Organization/WebSite JSON-LD 在页面内渲染） */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale?: string }>;
+}): Promise<Metadata> {
+  const { locale: rawLocale } = await params;
+  const locale = normalizeLocale(rawLocale) ?? DEFAULT_LOCALE;
+  const site = await getSiteInfo();
+  return {
+    title: site?.siteName || "joho.cn",
+    description: site?.siteDescription || undefined,
+    alternates: { canonical: `${SITE_URL}${localizedPath(locale, "/")}` },
+  };
+}
+
 export default async function HomePage({
   params,
 }: {
@@ -82,8 +99,19 @@ export default async function HomePage({
   // 仅当地图模块在列时才拉取 seo-meta（避免无谓请求）
   const seoMeta = modules.includes("map") ? await getSeoMeta() : null;
 
+  // 站点级结构化数据：Organization + WebSite（供文章 JSON-LD 的 publisher 与搜索引擎引用）
+  const siteName = site?.siteName || "joho.cn";
+  const siteJsonLd = [
+    { "@context": "https://schema.org", "@type": "Organization", name: siteName, url: SITE_URL },
+    { "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: SITE_URL },
+  ];
+
   return (
     <main className="home">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
+      />
       {modules.map((name, i) => {
         switch (name) {
           case "hero":

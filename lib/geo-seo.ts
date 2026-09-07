@@ -1,8 +1,10 @@
 import type { GeoArticle } from "@/lib/geo-article";
+import { SITE_URL } from "@/lib/env";
 
 export function buildGeoJsonLd(article: GeoArticle, site: any): Record<string, unknown> | null {
   const type = article.jsonLdType || (article.type === "geo-faq" ? "FAQPage" : "Article");
   const authorName = article.author?.name || article.authorName;
+  const image = article.coverImage?.url ? `${SITE_URL}${article.coverImage.url}` : undefined;
   const base = {
     "@context": "https://schema.org",
     "@type": type,
@@ -10,7 +12,7 @@ export function buildGeoJsonLd(article: GeoArticle, site: any): Record<string, u
     description: article.metaDescription || "",
     datePublished: article.publishedAt,
     dateModified: article.updatedAt,
-    image: article.coverImage?.url,
+    ...(image ? { image } : {}),
     author: authorName ? { "@type": "Person", name: authorName } : undefined,
     publisher: { "@type": "Organization", name: site?.siteName || "" },
     mainEntityOfPage: article.canonicalUrl || undefined,
