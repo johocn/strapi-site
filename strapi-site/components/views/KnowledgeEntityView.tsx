@@ -42,6 +42,7 @@ export async function generateEntityMetadata(slug: string): Promise<Metadata> {
   return {
     title: `${entity.name} - ${TYPE_LABELS[String(entity["@type"] || "")] || "知识实体"}`,
     description: entity.description || undefined,
+    alternates: { canonical: `${SITE_URL}/knowledge/${slug}` },
   };
 }
 
@@ -53,8 +54,19 @@ export async function KnowledgeEntityView({ slug, locale }: { slug: string; loca
   const incoming = relationItems(entity, "incoming");
   const articles = Array.isArray(entity.articles) ? entity.articles : [];
 
+  // 实体页结构化数据：@type 透传 schema.org 类型，关联 sameAs 指向外部权威来源
+  const entityJsonLd = {
+    "@context": "https://schema.org",
+    "@type": entity["@type"] || "Thing",
+    name: entity.name,
+    ...(entity.description ? { description: entity.description } : {}),
+    ...(entity.url ? { url: entity.url } : { url: `${SITE_URL}/knowledge/${slug}` }),
+    ...(Array.isArray(entity.sameAs) && entity.sameAs.length > 0 ? { sameAs: entity.sameAs } : {}),
+  };
+
   return (
     <div className="entity-page">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(entityJsonLd) }} />
       <header className="entity-header">
         <span className="entity-type">{TYPE_LABELS[String(entity["@type"] || "")] || String(entity["@type"] || "实体")}</span>
         <h1>{entity.name}</h1>
