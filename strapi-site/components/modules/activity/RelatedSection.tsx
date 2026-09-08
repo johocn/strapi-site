@@ -1,4 +1,4 @@
-import type { ActivityCard, RelatedGroup } from "@/lib/activity";
+import type { ActivityCard, ActivityOverrideItem, RelatedGroup } from "@/lib/activity";
 
 /** 类型展示顺序 */
 const TYPE_ORDER = [
@@ -25,10 +25,10 @@ const TYPE_LABELS: Record<string, string> = {
   geoArticle: "相关文章",
 };
 
-/** relatedOverride 键名 → 展示类型键名 */
+/** relatedOverride 键名 → 展示类型键名（管理端"文章"数据源为 GEO 文章，映射到 geoArticle 类型） */
 const OVERRIDE_KEYS: Record<string, string> = {
   activities: "activity",
-  articles: "article",
+  articles: "geoArticle",
   cases: "case",
   products: "product",
   faqs: "faq",
@@ -36,6 +36,23 @@ const OVERRIDE_KEYS: Record<string, string> = {
   lessons: "lesson",
   tutorials: "tutorial",
 };
+
+/** GEO 文章类型 → 落地页路由前缀（与 geo-article 数据层 resolveGeoRoutePrefix 一致） */
+function geoArticlePrefix(type?: string): string {
+  return type === "geo-faq" ? "/geo-faq" :
+    type === "local-report" ? "/local-report" :
+    type === "local-comparison" ? "/local-comparison" :
+    type === "local-list" ? "/local-list" : "/geo-article";
+}
+
+/** override 项 → 卡片项：GEO 文章（有 slug）构建落地页 URL，其余按已存 url */
+function overrideToCard(item: ActivityOverrideItem): CardItem {
+  const hasGeoUrl = item.slug && !item.url;
+  const url = item.url
+    || (hasGeoUrl ? `https://www.joho.cn${geoArticlePrefix(item.type)}/${encodeURIComponent(item.slug!)}` : "")
+    || "";
+  return { title: item.title, summary: item.summary, url };
+}
 
 type CardItem = { title?: string; summary?: string; url?: string };
 
@@ -81,7 +98,7 @@ export default function RelatedSection({
       const overrideKey = Object.keys(OVERRIDE_KEYS).find((k) => OVERRIDE_KEYS[k] === key);
       const items = overrideKey ? (override as Record<string, unknown>)[overrideKey] : [];
       if (Array.isArray(items) && items.length > 0) {
-        groups.push({ type: key, items: items as CardItem[] });
+        groups.push({ type: key, items: (items as ActivityOverrideItem[]).map(overrideToCard) });
       }
     }
   } else {
