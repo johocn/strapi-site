@@ -9,6 +9,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 /**
  * GEO 模块：权威依据（文章背书的真值声明）。
+ * 默认折叠（<details> 收起），内容仍在 SSR HTML 中，SEO 爬虫可抓取、不影响正文阅读。
  */
 export default function TruthBasis({ article }: { article: GeoArticle }) {
   const basis = article.truthBasis ?? [];
@@ -16,26 +17,31 @@ export default function TruthBasis({ article }: { article: GeoArticle }) {
   return (
     <section className="geo-truth-basis">
       <h2>权威依据</h2>
-      <ul>
-        {basis.map((t) => (
-          <li key={t.id} className="geo-truth-item">
-            <div className="geo-truth-claim">{t.claim}</div>
-            {t.canonicalValue && <div className="geo-truth-value">权威值：{t.canonicalValue}</div>}
-            <div className="geo-truth-meta">
-              {t.canonicalSourceUrl ? (
-                <a href={t.canonicalSourceUrl} target="_blank" rel="noopener noreferrer">查看来源</a>
-              ) : t.canonicalSourceType ? (
-                <span>来源类型：{t.canonicalSourceType}</span>
-              ) : null}
-              {t.verificationStatus && (
-                <span className={`geo-truth-badge geo-truth-${t.verificationStatus}`}>
-                  {STATUS_LABEL[t.verificationStatus] ?? t.verificationStatus}
-                </span>
-              )}
-            </div>
-          </li>
-        ))}
-      </ul>
+      <details className="geo-collapse">
+        <summary className="geo-collapse-summary">
+          查看真值声明（{basis.length} 条）
+        </summary>
+        <ul>
+          {basis.map((t) => (
+            <li key={t.id} className="geo-truth-item">
+              <div className="geo-truth-claim">{t.claim}</div>
+              {t.canonicalValue && <div className="geo-truth-value">权威值：{t.canonicalValue}</div>}
+              <div className="geo-truth-meta">
+                {t.canonicalSourceUrl ? (
+                  <a href={t.canonicalSourceUrl} target="_blank" rel="noopener noreferrer">查看来源</a>
+                ) : t.canonicalSourceType ? (
+                  <span>来源类型：{t.canonicalSourceType}</span>
+                ) : null}
+                {t.verificationStatus && (
+                  <span className={`geo-truth-badge geo-truth-${t.verificationStatus}`}>
+                    {STATUS_LABEL[t.verificationStatus] ?? t.verificationStatus}
+                  </span>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </details>
     </section>
   );
 }
