@@ -319,6 +319,14 @@ body {
 }
 
 /* ===== GEO 文章模块 ===== */
+/* GEO 页容器：与详情页同宽居中，左右留白形成页面边界 */
+.geo-page {
+  max-width: var(--detail-max-width);
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  width: 100%;
+}
+
 .geo-risk-tip {
   display: flex;
   gap: 8px;
@@ -375,6 +383,50 @@ body {
   border-collapse: collapse;
   margin: 16px 0;
   font-size: 14px;
+  /* 窄屏横向滚动：块级容器保留表格内部布局，超出宽度时滚动而非挤压 */
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 元数据折叠（权威依据 / 文中涉及）：默认收起，内容仍在 HTML 中可被爬虫抓取 */
+.geo-collapse {
+  margin-top: 10px;
+}
+
+.geo-collapse summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  color: #4b5563;
+  padding: 8px 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.geo-collapse summary:hover {
+  background: #f3f4f6;
+}
+
+.geo-collapse[open] summary {
+  margin-bottom: 12px;
+}
+
+.geo-collapse summary::after {
+  content: "▾";
+  font-size: 12px;
+  color: #9ca3af;
+  transition: transform 0.2s;
+}
+
+.geo-collapse[open] summary::after {
+  transform: rotate(180deg);
 }
 
 .geo-body th,
@@ -404,7 +456,9 @@ body {
 .geo-internal-links h2,
 .geo-summary-tips h2,
 .geo-info-boundary h2,
-.geo-lead-form h2 {
+.geo-lead-form h2,
+.geo-truth-basis h2,
+.geo-entity-mentions h2 {
   font-size: 18px;
   margin-bottom: 12px;
   font-family: var(--font-heading);
@@ -541,10 +595,52 @@ body {
   cursor: pointer;
 }
 
+/* 作者卡片：头像 + 姓名/职位/从业年限常显（信任要素），bio 折叠（可抓取不干扰阅读） */
+.geo-author-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin: 32px 0;
+  padding: 20px 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+  background: #fafafa;
+}
+
+.geo-author-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.geo-author-name {
+  font-size: 16px;
+  font-weight: 600;
+  font-family: var(--font-heading);
+}
+
+.geo-author-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: #6b7280;
+  font-size: 13px;
+  margin: 4px 0 8px;
+}
+
+.geo-author-bio {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.7;
+  margin: 0;
+}
+
 .geo-footer {
   border-top: 1px solid #e5e7eb;
   margin-top: var(--space-section);
-  padding: 24px;
+  padding: 24px 0 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -630,3 +726,321 @@ body {
 .rel-predicate { flex: 0 0 auto; color: var(--brand, #4f46e5); font-size: 13px; }
 .entity-articles a { color: inherit; text-decoration: none; }
 .entity-articles a:hover { text-decoration: underline; }
+
+/* ===== 活动页（线下活动详情 + 列表） ===== */
+.activity-page {
+  max-width: var(--detail-max-width);
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  width: 100%;
+}
+
+/* Hero：封面 + 信息区并排，移动端纵向堆叠 */
+.activity-hero {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 32px;
+}
+
+.activity-hero-cover {
+  flex: 0 0 40%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #f3f4f6;
+}
+
+.activity-hero-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.activity-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-hero-title {
+  font-size: 26px;
+  line-height: 1.4;
+  font-family: var(--font-heading);
+  margin-bottom: 12px;
+}
+
+/* 无封面兜底：渐变背景 + 居中文字 */
+.activity-cover-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 15px;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+/* 状态徽章 */
+.activity-badges {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.activity-status {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.activity-status.ok {
+  color: #15803d;
+  background: #dcfce7;
+}
+
+.activity-status.warn {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.activity-status.muted {
+  color: #6b7280;
+  background: #f3f4f6;
+}
+
+/* Hero meta 列表 */
+.activity-meta {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: #6b7280;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* 正文 */
+.activity-content {
+  margin: 24px 0 32px;
+}
+
+.activity-desc {
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+.activity-desc p {
+  margin: 0 0 12px;
+}
+
+/* 讲师卡片 */
+.activity-lecturer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 14px 16px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+
+.activity-lecturer-label {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.activity-lecturer-name {
+  font-weight: 600;
+}
+
+.activity-lecturer-position {
+  color: #6b7280;
+}
+
+/* 相关区块 */
+.activity-related {
+  margin: 32px 0;
+}
+
+.activity-related-group {
+  margin-bottom: 28px;
+}
+
+.activity-related-title {
+  font-size: 18px;
+  margin-bottom: 12px;
+  font-family: var(--font-heading);
+}
+
+.activity-related-empty {
+  padding: 24px;
+  text-align: center;
+  color: #9ca3af;
+  border: 1px dashed #e5e7eb;
+  border-radius: var(--radius);
+}
+
+/* 卡片网格：3 列，移动端 1 列 */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.related-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-bg);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.related-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.related-card-title {
+  font-size: 15px;
+  line-height: 1.4;
+  font-family: var(--font-heading);
+}
+
+.related-card-summary {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.related-card-action {
+  margin-top: auto;
+  font-size: 13px;
+  color: var(--color-primary);
+}
+
+.related-card-action.is-placeholder {
+  color: #9ca3af;
+}
+
+/* CTA 区 */
+.activity-cta {
+  margin: 40px 0 8px;
+  text-align: center;
+}
+
+.activity-cta-seats {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+.activity-cta-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.activity-cta .geo-cta {
+  margin: 0;
+}
+
+.activity-cta-error {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #b45309;
+}
+
+/* 报名按钮 disabled 态 */
+.geo-cta.disabled {
+  background: #d1d5db;
+  color: #fff;
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+.geo-cta.disabled:hover {
+  opacity: 1;
+}
+
+/* 次级 ghost 按钮 */
+.geo-cta-ghost {
+  background: var(--color-bg);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.geo-cta-ghost:hover {
+  background: rgba(26, 115, 232, 0.06);
+}
+
+/* 活动列表页 */
+.activity-list {
+  display: grid;
+  gap: 16px;
+}
+
+.activity-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-bg);
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.activity-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.activity-card-title {
+  font-size: 17px;
+  font-family: var(--font-heading);
+}
+
+.activity-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: #6b7280;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* 移动端：Hero 纵向堆叠、相关卡片网格 1 列 */
+@media (max-width: 640px) {
+  .activity-hero {
+    flex-direction: column;
+  }
+
+  .activity-hero-cover {
+    flex: none;
+    width: 100%;
+  }
+
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+}
