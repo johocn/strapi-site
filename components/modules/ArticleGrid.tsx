@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { localizedPath } from "@/lib/i18n";
 import { resolveConfig, type SiteConfigBundle } from "@/lib/site-config";
+import { resolveGeoRoutePrefix } from "@/lib/geo-article";
 import type { FeedArticle } from "./ArticleFeed";
 
 type ArticleGridProps = {
@@ -46,7 +47,7 @@ export default function ArticleGrid({
         {articles.map((a) => (
           <li key={a.id ?? a.documentId} className="article-grid-item">
             {showCover ? <div className="article-grid-cover" aria-hidden="true" /> : null}
-            <Link href={localizedPath(locale, `/articles/${a.slug}`)}>
+            <Link href={localizedPath(locale, `${resolveGeoRoutePrefix(a.type ?? "geo-article")}/${a.slug}`)}>
               {a.title}
             </Link>
           </li>
