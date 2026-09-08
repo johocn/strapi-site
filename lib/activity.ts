@@ -17,6 +17,9 @@ export type ActivityOverrideItem = {
   title?: string;
   summary?: string;
   url?: string;
+  /** 管理端勾选时携带的原始字段，用于构建落地页 URL（如 GEO 文章 slug） */
+  slug?: string;
+  type?: string;
 };
 
 /** 活动 schema 字段子集（全部可选，构建/运行期按需兜底） */
