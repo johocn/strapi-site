@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { localizedPath } from "@/lib/i18n";
 import { resolveConfig, type SiteConfigBundle } from "@/lib/site-config";
+import { resolveGeoRoutePrefix, type GeoArticleType } from "@/lib/geo-article";
 
 export type FeedArticle = {
   id: number;
   documentId?: string;
   title: string;
   slug: string;
+  type?: GeoArticleType;
 };
 
 type ArticleFeedProps = {
@@ -50,7 +52,7 @@ export default function ArticleFeed({
       <ul className="article-feed-list">
         {articles.map((a) => (
           <li key={a.id ?? a.documentId}>
-            <Link href={localizedPath(locale, `/articles/${a.slug}`)}>
+            <Link href={localizedPath(locale, `${resolveGeoRoutePrefix(a.type ?? "geo-article")}/${a.slug}`)}>
               {a.title}
             </Link>
           </li>

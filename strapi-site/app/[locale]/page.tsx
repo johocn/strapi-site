@@ -5,6 +5,7 @@ import { API_ROOT, SITE_URL } from "@/lib/env";
 import Hero from "@/components/modules/Hero";
 import ArticleFeed from "@/components/modules/ArticleFeed";
 import MapBlock from "@/components/modules/MapBlock";
+import type { GeoArticleType } from "@/lib/geo-article";
 
 /** 静态导出：仅备选语言（en）带 /en/ 前缀；默认语言由 (default) 路由组在根路径生成 */
 export async function generateStaticParams() {
@@ -22,6 +23,7 @@ type Article = {
   documentId?: string;
   title: string;
   slug: string;
+  type?: GeoArticleType;
 };
 
 /** 首页无配置时回退的内置模块列表（一级兜底，硬编码于前端） */
@@ -37,9 +39,10 @@ async function getSiteInfo(): Promise<SiteInfo | null> {
   }
 }
 
+/** 首页精选数据源：GEO 文章（geo_articles 表，按发布时间倒序取最新） */
 async function getFeaturedArticles(locale: string): Promise<Article[]> {
   try {
-    const res = await fetch(`${API_ROOT}/articles/featured?locale=${locale}`);
+    const res = await fetch(`${API_ROOT}/geo-articles/featured?locale=${locale}&limit=5`);
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : data?.results ?? [];
