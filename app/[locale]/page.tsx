@@ -102,19 +102,8 @@ export default async function HomePage({
   // 仅当地图模块在列时才拉取 seo-meta（避免无谓请求）
   const seoMeta = modules.includes("map") ? await getSeoMeta() : null;
 
-  // 站点级结构化数据：Organization + WebSite（供文章 JSON-LD 的 publisher 与搜索引擎引用）
-  const siteName = site?.siteName || "joho.cn";
-  const siteJsonLd = [
-    { "@context": "https://schema.org", "@type": "Organization", name: siteName, url: SITE_URL },
-    { "@context": "https://schema.org", "@type": "WebSite", name: siteName, url: SITE_URL },
-  ];
-
   return (
     <main className="home">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }}
-      />
       {modules.map((name, i) => {
         switch (name) {
           case "hero":

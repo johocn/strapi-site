@@ -77,10 +77,44 @@ export async function generateGeoMetadata({
 
   const alternates: Metadata["alternates"] = { languages };
   if (article.canonicalUrl) alternates.canonical = article.canonicalUrl;
+
+  // OG/Twitter 共用基础信息
+  const ogTitle = article.metaTitle || article.title;
+  const ogDescription = article.metaDescription;
+  // 当前页绝对 URL：优先 canonicalUrl，否则用本地化路径
+  const pageUrl = article.canonicalUrl || absoluteUrl(localizedPath(locale, `${prefix}/${article.slug}`));
+  // 作者名：结构化 author 优先，其次 authorName 字段
+  const authorName = article.author?.name || article.authorName;
+  // 封面图：coverImage.url 已是 /uploads/xxx 相对路径，直接拼站点域
+  const ogImages = article.coverImage?.url ? [{ url: `${SITE_URL}${article.coverImage.url}` }] : undefined;
+
   return {
-    title: article.metaTitle || article.title,
-    description: article.metaDescription,
+    title: ogTitle,
+    description: ogDescription,
     alternates,
+    openGraph: {
+      title: ogTitle,
+      description: ogDescription,
+      url: pageUrl,
+      siteName: "joho.cn",
+      type: "article",
+      publishedTime: article.publishedAt,
+      modifiedTime: article.updatedAt,
+      // 可选字段按 Next Metadata 约定缺失时不输出
+      ...(authorName ? { authors: [authorName] } : {}),
+      ...(ogImages ? { images: ogImages } : {}),
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: ogTitle,
+      description: ogDescription,
+      ...(ogImages ? { images: ogImages } : {}),
+    },
+    // allowIndex 默认 true（仅显式 false 才禁止收录），noFollow 默认 false
+    robots: {
+      index: article.allowIndex !== false,
+      follow: !article.noFollow,
+    },
   };
 }
 
