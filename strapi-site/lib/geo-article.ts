@@ -66,6 +66,8 @@ export type GeoArticle = {
   comparisonData?: { dimension?: string; items?: { name?: string; score?: string | number; note?: string }[] }[];
   listItems?: { name?: string; desc?: string; price?: string; link?: string }[];
   coverImage?: any;
+  allowIndex?: boolean;
+  noFollow?: boolean;
   riskType?: RiskType;
   riskDisclaimer?: string;
   ctaType?: "none" | "download-list" | "consult-appointment";
