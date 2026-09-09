@@ -48,12 +48,15 @@ export type GeoArticle = {
   truthBasis?: {
     id: number;
     claim: string;
+    claimKey?: string;
+    claimCategory?: string;
     canonicalValue?: string;
     canonicalSourceUrl?: string;
     canonicalSourceType?: string;
     verificationStatus?: string;
     lastVerifiedAt?: string;
   }[];
+  truthBasisSections?: { claimKey?: string; section?: string }[];
   mentionedEntities?: {
     id: number;
     name: string;
