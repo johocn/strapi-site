@@ -8,7 +8,7 @@ import {
   resolveGeoRoutePrefix,
   type GeoArticleType,
 } from "@/lib/geo-article";
-import { buildGeoJsonLd } from "@/lib/geo-seo";
+import { buildGeoJsonLd, buildBreadcrumbJsonLd } from "@/lib/geo-seo";
 import GeoAnalytics from "@/components/geo/GeoAnalytics";
 import Breadcrumb from "@/components/modules/Breadcrumb";
 import RiskTip from "@/components/modules/geo/RiskTip";
@@ -137,6 +137,15 @@ export async function GeoArticleView({
   const jsonLd = buildGeoJsonLd(article, bundle?.site);
   const customerServiceUrl = (bundle?.site as any)?.customerServiceUrl;
   const homeLabel = UI_STRINGS[locale]?.navHome ?? "首页";
+  const prefix = resolveGeoRoutePrefix(type);
+  const pageUrl = article.canonicalUrl || absoluteUrl(localizedPath(locale, `${prefix}/${article.slug}`));
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd(
+    [
+      { label: homeLabel, href: "/" },
+      { label: CATEGORY_LABELS[type][locale] ?? CATEGORY_LABELS[type][DEFAULT_LOCALE] },
+    ],
+    pageUrl,
+  );
 
   return (
     <main className="geo-page">
@@ -164,7 +173,7 @@ export async function GeoArticleView({
           case "summary-tips": return <SummaryTips key={i} article={article} />;
           case "info-boundary": return <InfoBoundary key={i} article={article} />;
           case "truth-basis": return <TruthBasis key={i} article={article} />;
-          case "entity-mentions": return <EntityMentions key={i} article={article} />;
+          case "entity-mentions": return <EntityMentions key={i} article={article} locale={locale} />;
           case "author-card": return <AuthorCard key={i} article={article} />;
           case "cta": return <Cta key={i} article={article} />;
           case "lead-form": return <LeadForm key={i} article={article} />;
@@ -176,6 +185,12 @@ export async function GeoArticleView({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {breadcrumbJsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
         />
       )}
       {customerServiceUrl && <FloatingService customerServiceUrl={customerServiceUrl} article={article} />}
