@@ -17,23 +17,39 @@ export function buildGeoJsonLd(article: GeoArticle, site: any): Record<string, u
     publisher: { "@type": "Organization", name: site?.siteName || "" },
     mainEntityOfPage: article.canonicalUrl || undefined,
   };
+  const mentions =
+    (article.mentionedEntities ?? [])
+      .map((e) => ({ "@type": "DefinedTerm", name: e.name, ...(e.slug ? { url: `${SITE_URL}/knowledge/${e.slug}` } : {}) }))
+      .filter((m) => m.name);
+  const citation = (article.truthBasis ?? [])
+    .map((t) => ({
+      "@type": "CreativeWork",
+      name: t.claim,
+      ...(t.canonicalSourceUrl ? { url: t.canonicalSourceUrl } : {}),
+      ...(t.verificationStatus === "verified" ? { review: { "@type": "Review", reviewRating: { "@type": "Rating", ratingValue: "5", bestRating: "5" } } } : {}),
+    }))
+    .filter((c) => c.name);
+  const withMeta = (extra: Record<string, unknown>) => ({
+    ...base,
+    ...extra,
+    ...(mentions.length ? { mentions } : {}),
+    ...(citation.length ? { citation } : {}),
+  });
   if (type === "FAQPage") {
-    return {
-      ...base,
+    return withMeta({
       mainEntity: [{
         "@type": "Question",
         name: article.faqQuestion || article.title,
         acceptedAnswer: { "@type": "Answer", text: article.content?.slice(0, 500) || "" },
       }],
-    };
+    });
   }
   if (type === "LocalBusiness") {
-    return {
-      ...base,
+    return withMeta({
       name: site?.siteName,
       address: { "@type": "PostalAddress", streetAddress: site?.organizationAddress || "" },
       telephone: site?.organizationPhone || "",
-    };
+    });
   }
   if (type === "ItemList") {
     const items =
@@ -43,7 +59,7 @@ export function buildGeoJsonLd(article: GeoArticle, site: any): Record<string, u
             (d.items ?? []).map((it) => ({ "@type": "ListItem", name: it.name }))
           ).map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name }));
     if (items.length === 0) return null;
-    return { ...base, name: site?.siteName, itemListElement: items };
+    return withMeta({ name: site?.siteName, itemListElement: items });
   }
-  return base;
+  return withMeta({});
 }
