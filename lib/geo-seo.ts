@@ -16,10 +16,18 @@ export function buildGeoJsonLd(article: GeoArticle, site: any): Record<string, u
     author: authorName ? { "@type": "Person", name: authorName } : undefined,
     publisher: { "@type": "Organization", name: site?.siteName || "" },
     mainEntityOfPage: article.canonicalUrl || undefined,
+    // 语音搜索 GEO 信号：告知搜索引擎正文区块可朗读
+    speakable: [{ "@type": "SpeakableSpecification", cssSelector: [".geo-body"] }],
   };
   const mentions =
     (article.mentionedEntities ?? [])
-      .map((e) => ({ "@type": "DefinedTerm", name: e.name, ...(e.slug ? { url: `${SITE_URL}/knowledge/${e.slug}` } : {}) }))
+      .map((e) => ({
+        "@type": "DefinedTerm",
+        name: e.name,
+        ...(e.slug ? { url: `${SITE_URL}/knowledge/${e.slug}` } : {}),
+        // 实体类型非默认 DefinedTerm 时补充 additionalType，避免与 @type 重复
+        ...(e.entityType && e.entityType !== "DefinedTerm" ? { additionalType: e.entityType } : {}),
+      }))
       .filter((m) => m.name);
   const citation = (article.truthBasis ?? [])
     .map((t) => ({
@@ -62,4 +70,29 @@ export function buildGeoJsonLd(article: GeoArticle, site: any): Record<string, u
     return withMeta({ name: site?.siteName, itemListElement: items });
   }
   return withMeta({});
+}
+
+// 相对路径转绝对 URL：已带协议的原样返回
+function absoluteUrl(path: string): string {
+  return path.startsWith("http") ? path : `${SITE_URL}${path}`;
+}
+
+/**
+ * 生成面包屑 BreadcrumbList JSON-LD
+ * 末层无 href 时兜底为当前页 pageUrl；无 item 的项会被过滤；空数组返回 null
+ */
+export function buildBreadcrumbJsonLd(crumbs: { label: string; href?: string }[], pageUrl: string): Record<string, unknown> | null {
+  if (crumbs.length === 0) return null;
+  const itemListElement = crumbs
+    .map((c, i) => {
+      const item = c.href ? absoluteUrl(c.href) : i === crumbs.length - 1 ? pageUrl : undefined;
+      return item === undefined ? null : { "@type": "ListItem", position: i + 1, name: c.label, item };
+    })
+    .filter((el): el is { "@type": "ListItem"; position: number; name: string; item: string } => el !== null);
+  if (itemListElement.length === 0) return null;
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement,
+  };
 }
