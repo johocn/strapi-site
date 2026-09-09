@@ -429,6 +429,56 @@ body {
   transform: rotate(180deg);
 }
 
+/* 权威依据：总述与段落标注 */
+.geo-truth-summary {
+  font-size: 14px;
+  color: #4b5563;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: 8px 0;
+}
+.geo-truth-section {
+  font-size: 12px;
+  color: var(--color-primary);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.geo-truth-unbound { margin-top: 8px; opacity: 0.75; }
+.geo-collapse-inner summary {
+  font-size: 13px;
+  color: #6b7280;
+  cursor: pointer;
+}
+.geo-collapse-inner .geo-truth-claim { padding: 4px 0; }
+
+/* 文中涉及：标签云 */
+.geo-entity-tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+.geo-entity-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #374151;
+}
+.geo-entity-tag .geo-entity-type {
+  font-size: 11px;
+  color: #9ca3af;
+}
+.geo-entity-generic { display: none; }
+
 .geo-body th,
 .geo-body td {
   border: 1px solid #e5e7eb;
