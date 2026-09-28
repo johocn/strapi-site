@@ -55,13 +55,44 @@ export async function KnowledgeEntityView({ slug, locale }: { slug: string; loca
   const articles = Array.isArray(entity.articles) ? entity.articles : [];
 
   // 实体页结构化数据：@type 透传 schema.org 类型，关联 sameAs 指向外部权威来源
+  // 关系编入 JSON-LD：谓词直接展开；客体实体用 @id 指向其 /knowledge 实体页，形成可解析的实体图
+  const outgoingProps: Record<string, unknown> = {};
+  const incomingProps: Record<string, unknown> = {};
+  const pushProp = (bag: Record<string, unknown>, predicate: string, value: unknown) => {
+    const current = bag[predicate];
+    if (current === undefined) bag[predicate] = value;
+    else if (Array.isArray(current)) current.push(value);
+    else bag[predicate] = [current, value];
+  };
+  const relationValue = (rel: any, direction: "outgoing" | "incoming"): unknown => {
+    const target = direction === "incoming" ? rel.subjectEntity : rel.objectEntity;
+    if (target?.name) {
+      return { ...(target.slug ? { "@id": `${SITE_URL}/knowledge/${target.slug}` } : {}), name: target.name };
+    }
+    if (rel.objectText) return rel.objectText;
+    if (rel.objectValue !== undefined && rel.objectValue !== null) return rel.objectValue;
+    return undefined;
+  };
+  for (const rel of Array.isArray(entity.outgoing) ? entity.outgoing : []) {
+    const value = relationValue(rel, "outgoing");
+    if (value !== undefined) pushProp(outgoingProps, rel.predicate, value);
+  }
+  // incoming 语义是「对方 → 本实体」，直接展开会反转主客，故用 JSON-LD 的 @reverse 表达
+  for (const rel of Array.isArray(entity.incoming) ? entity.incoming : []) {
+    const value = relationValue(rel, "incoming");
+    if (value !== undefined) pushProp(incomingProps, rel.predicate, value);
+  }
+
   const entityJsonLd = {
     "@context": "https://schema.org",
     "@type": entity["@type"] || "Thing",
+    "@id": `${SITE_URL}/knowledge/${slug}`,
     name: entity.name,
     ...(entity.description ? { description: entity.description } : {}),
     ...(entity.url ? { url: entity.url } : { url: `${SITE_URL}/knowledge/${slug}` }),
     ...(Array.isArray(entity.sameAs) && entity.sameAs.length > 0 ? { sameAs: entity.sameAs } : {}),
+    ...outgoingProps,
+    ...(Object.keys(incomingProps).length > 0 ? { "@reverse": incomingProps } : {}),
   };
 
   return (
