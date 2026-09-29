@@ -88,6 +88,8 @@ export async function KnowledgeEntityView({ slug, locale }: { slug: string; loca
     "@type": entity["@type"] || "Thing",
     "@id": `${SITE_URL}/knowledge/${slug}`,
     name: entity.name,
+    ...(entity.version !== undefined ? { version: entity.version } : {}),
+    ...(entity.dateModified ? { dateModified: entity.dateModified } : {}),
     ...(entity.description ? { description: entity.description } : {}),
     ...(entity.url ? { url: entity.url } : { url: `${SITE_URL}/knowledge/${slug}` }),
     ...(Array.isArray(entity.sameAs) && entity.sameAs.length > 0 ? { sameAs: entity.sameAs } : {}),

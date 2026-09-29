@@ -18,6 +18,8 @@ export type KnowledgeEntity = {
   slug?: string;
   verificationStatus?: string;
   confidence?: number;
+  version?: number;
+  dateModified?: string;
   sameAs?: string[];
   articles?: { slug: string; title: string; type: string; publishedAt?: string }[];
   incoming?: any[];
