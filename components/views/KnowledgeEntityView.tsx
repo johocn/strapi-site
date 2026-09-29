@@ -93,6 +93,11 @@ export async function KnowledgeEntityView({ slug, locale }: { slug: string; loca
     ...(entity.description ? { description: entity.description } : {}),
     ...(entity.url ? { url: entity.url } : { url: `${SITE_URL}/knowledge/${slug}` }),
     ...(Array.isArray(entity.sameAs) && entity.sameAs.length > 0 ? { sameAs: entity.sameAs } : {}),
+    ...(entity.identifier ? { identifier: entity.identifier } : {}),
+    ...(entity.legalName ? { legalName: entity.legalName } : {}),
+    ...(entity.alternateName ? { alternateName: entity.alternateName } : {}),
+    ...(entity.address ? { address: entity.address } : {}),
+    ...(entity.icp ? { icp: entity.icp } : {}),
     ...outgoingProps,
     ...(Object.keys(incomingProps).length > 0 ? { "@reverse": incomingProps } : {}),
   };

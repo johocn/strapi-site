@@ -21,6 +21,11 @@ export type KnowledgeEntity = {
   version?: number;
   dateModified?: string;
   sameAs?: string[];
+  identifier?: string;
+  legalName?: string;
+  alternateName?: string;
+  address?: string;
+  icp?: string;
   articles?: { slug: string; title: string; type: string; publishedAt?: string }[];
   incoming?: any[];
   outgoing?: EntityRelation[];
