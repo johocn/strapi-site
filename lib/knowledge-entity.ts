@@ -38,7 +38,7 @@ export async function getKnowledgeEntity(slug: string): Promise<{ status: number
   }
 }
 
-/** 构建期枚举全部实体 slug（knowledge-graph.json @graph 的 @id 即 slug） */
+/** 构建期枚举全部实体 slug（@id 可能是裸 slug，也可能是绝对 URL /knowledge/{slug}，统一取末段） */
 export async function listKnowledgeEntitySlugs(): Promise<string[]> {
   try {
     const res = await fetch(`${API_ROOT}/knowledge-graph.json`);
@@ -47,8 +47,13 @@ export async function listKnowledgeEntitySlugs(): Promise<string[]> {
     const graph = Array.isArray(data) ? data : data?.["@graph"];
     if (!Array.isArray(graph)) return [];
     return graph
-      .map((n: any) => (typeof n?.["@id"] === "string" ? n["@id"] : n?.slug))
-      .filter((s: unknown): s is string => typeof s === "string" && s.length > 0);
+      .map((n: any) => {
+        const id = typeof n?.["@id"] === "string" ? n["@id"] : n?.slug;
+        if (typeof id !== "string") return "";
+        const segments = id.split("/").filter(Boolean);
+        return segments.length > 0 ? segments[segments.length - 1] : "";
+      })
+      .filter((s: string) => s.length > 0);
   } catch {
     return [];
   }
