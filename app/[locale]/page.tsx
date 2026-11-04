@@ -5,11 +5,16 @@ import { API_ROOT, SITE_URL } from "@/lib/env";
 import Hero from "@/components/modules/Hero";
 import ArticleFeed from "@/components/modules/ArticleFeed";
 import MapBlock from "@/components/modules/MapBlock";
+import { SectionHomeView } from "@/components/views/SectionView";
+import { listSections, getSection, listSectionHighlights } from "@/lib/section";
+import { parseSectionRoute } from "@/lib/section-route";
 import type { GeoArticleType } from "@/lib/geo-article";
 
-/** 静态导出：仅备选语言（en）带 /en/ 前缀；默认语言由 (default) 路由组在根路径生成 */
+/** 静态导出：仅备选语言（en）带 /en/ 前缀；默认语言首页由 (default) 路由组在根路径生成
+ *  板块首页无前缀（/{板块}）也由本路由承载：首段未命中语言时按板块 slug 解析 */
 export async function generateStaticParams() {
-  return alternateLocaleSegments();
+  const sections = await listSections(DEFAULT_LOCALE);
+  return [...alternateLocaleSegments(), ...sections.map((s) => ({ locale: s.slug }))];
 }
 
 type SiteInfo = {
@@ -70,6 +75,20 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale: rawLocale } = await params;
   const locale = normalizeLocale(rawLocale) ?? DEFAULT_LOCALE;
+
+  // 板块首页元数据：首段未命中语言时按板块 slug 解析
+  const sectionRoute = normalizeLocale(rawLocale) ? null : parseSectionRoute(rawLocale);
+  if (sectionRoute) {
+    const section = await getSection(sectionRoute.sectionSlug, sectionRoute.locale);
+    if (section) {
+      return {
+        title: section.seoTitle || `${section.name} | joho.cn`,
+        description: section.seoDescription || section.description || undefined,
+        alternates: { canonical: `${SITE_URL}/${section.slug}` },
+      };
+    }
+  }
+
   const site = await getSiteInfo();
   return {
     title: site?.siteName || "joho.cn",
@@ -85,6 +104,22 @@ export default async function HomePage({
 }) {
   const { locale: rawLocale } = await params;
   const locale = normalizeLocale(rawLocale) ?? DEFAULT_LOCALE;
+
+  // 板块首页：首段未命中语言 → 当作板块 slug；查不到板块时回退站点首页
+  const sectionRoute = normalizeLocale(rawLocale) ? null : parseSectionRoute(rawLocale);
+  if (sectionRoute) {
+    const section = await getSection(sectionRoute.sectionSlug, sectionRoute.locale);
+    if (section) {
+      const highlights = await listSectionHighlights(section.slug, sectionRoute.locale);
+      return (
+        <SectionHomeView
+          section={section}
+          locale={sectionRoute.locale}
+          highlights={highlights}
+        />
+      );
+    }
+  }
 
   const bundle = await getSiteConfig(SITE_URL);
   const [site, articles] = await Promise.all([
